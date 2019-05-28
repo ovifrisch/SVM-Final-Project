@@ -187,7 +187,7 @@ class svm:
 
 	def __optimality_criterion(self, i, j, gradients):
 		"""
-		Implements Line 5 of SMO
+		Implements Line 6 of SMO
 		"""
 
 		# This is the optimality criterion (11)
