@@ -9,7 +9,7 @@ class svm:
 	a Support Vector Machine (SVM)
 	"""
 
-	def __init__(self, kernel_type, C, gamma):
+	def __init__(self, kernel_type='rbf', C=1, gamma=1, degree=3):
 		"""
 		Parameters
 		----------
@@ -19,9 +19,11 @@ class svm:
 			Parameter for controlling compromise between soft and hard margin violations
 		gamma : float
 			Kernel coefficient for RBF kernel
+		degree: float
+			Exponent for ploynomial kernel
 		"""
-		self.kernel = Kernel(kernel_type, gamma)
-		self.C = C
+		self.__kernel = Kernel(kernel_type, gamma, degree)
+		self.__C = C
 
 	# Accepts X and Y training data and creates the model using SMO
 	def fit(self, X, y):
@@ -49,8 +51,10 @@ class svm:
 
 		# Computationally Intensive SMO
 		self.alphas = self.__sequential_minimal_optimization()
-		self.b = None # how to get b???
-		# self.test_conditions()
+
+		# Extract support vectors and b
+		self.support_vectors, self.support_vector_classes = self.__get_support_vectors()
+		self.__b = self.__get_b()
 
 	# Accepts a list of testing samples and returns the predicted classes
 	# Modeled after discriminant function in (6)
@@ -67,13 +71,40 @@ class svm:
 		preds = np.zeros((xs.shape[0])) # predictions
 		for i in range(xs.shape[0]):
 			x = xs[i, :]
-			kernel_vector = np.apply_along_axis(self.kernel.apply, 1, self.xs, x2=x)
-			zipped = zip(kernel_vector, self.ys, self.alphas)
-			products = [np.prod(tup) for tup in zipped]
-			summed = sum(products)
-			expr = summed + self.b
-			preds[i] = np.sign(expr)
+			preds[i] = np.sign(self.__sum_w_tranpose_x(x) + self.__b)
 		return preds
+
+	def __sum_w_tranpose_x(self, x):
+		"""
+		Implements the summation part of (6) in BTL using only the support vectors
+		"""
+		kernel_vector = np.apply_along_axis(self.__kernel.apply, 1, self.support_vectors, x2=x)
+		zipped = zip(kernel_vector, self.ys, self.alphas)
+		products = [np.prod(tup) for tup in zipped]
+		return sum(products)
+
+	def __get_b(self):
+		"""
+		Calculates B from the constraint equation using an arbitarary support vector
+		"""
+		return self.support_vector_classes[0] - self.__sum_w_tranpose_x(self.support_vectors[0, :])
+
+	# need to test this
+	def __get_support_vectors(self):
+		"""
+		Return : (ndarray, ndarray)
+			The support vectors for this classifier and their corresponding class membership (+1 or -1)
+		"""
+		num_supp_vecs = np.nonzero(self.alphas)
+		supp_vecs = np.matrix((num_supp_vecs, self.xs.shape[1]))
+		supp_vecs_idxs = np.matrix((num_supp_vecs, 1))
+		idx2 = 0
+		for i in range(self.__size):
+			if (self.alphas[i] != 0):
+				supp_vecs[idx2, :] = self.xs[i, :]
+				supp_vecs_idxs[idx2] = i
+				idx2 += 1
+		return supp_vecs, supp_vecs_idxs
 
 	def test_conditions(self):
 		s = sum(list(map(lambda a, y: a*y, self.alphas, self.ys)))
@@ -119,7 +150,7 @@ class svm:
 		self.__As = []
 		for i in range(self.__size):
 			if (self.ys[i] == -1):
-				self.__As.append(-self.C)
+				self.__As.append(-self.__C)
 			else:
 				self.__As.append(0)
 
@@ -133,7 +164,7 @@ class svm:
 		self.__Bs = []
 		for i in range(self.__size):
 			if (self.ys[i] == 1):
-				self.__Bs.append(self.C)
+				self.__Bs.append(self.__C)
 			else:
 				self.__Bs.append(0)
 
@@ -142,7 +173,7 @@ class svm:
 		"""
 		Implements Line 8 of SMO
 		"""
-		return gradients[k] - (lamb * self.ys[k] * self.kernel.apply(self.xs[i, :], self.xs[k, :])) + (lamb * self.ys[k] * self.kernel.apply(self.xs[j, :], self.xs[k, :]))
+		return gradients[k] - (lamb * self.ys[k] * self.__kernel.apply(self.xs[i, :], self.xs[k, :])) + (lamb * self.ys[k] * self.__kernel.apply(self.xs[j, :], self.xs[k, :]))
 
 	def __get_lambda(self, i, j, gradients, alphas):
 		"""
@@ -152,9 +183,9 @@ class svm:
 		arg2 = (self.ys[j] * alphas[j]) - self.__As[j]
 		yigi = self.ys[i] * gradients[i]
 		yjgj = self.ys[j] * gradients[j]
-		Kii = self.kernel.apply(self.xs[i, :], self.xs[i, :])
-		Kjj = self.kernel.apply(self.xs[j, :], self.xs[j, :])
-		Kij = self.kernel.apply(self.xs[i, :], self.xs[j, :])
+		Kii = self.__kernel.apply(self.xs[i, :], self.xs[i, :])
+		Kjj = self.__kernel.apply(self.xs[j, :], self.xs[j, :])
+		Kij = self.__kernel.apply(self.xs[i, :], self.xs[j, :])
 		arg3 = (yigi - yjgj) / (Kii + Kjj - (2*Kij))
 		return min(arg1, min(arg2, arg3))
 

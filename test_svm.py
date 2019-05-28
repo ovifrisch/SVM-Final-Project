@@ -11,7 +11,7 @@ if __name__ == "__main__":
 	negX = np.random.normal(loc=100, scale=1, size=int(num_samples/2))
 	X = np.transpose(np.matrix(np.append(posX, negX)))
 	ys = np.append(np.ones(int(num_samples / 2)), (-1 * np.ones(int(num_samples / 2))))
-	clf.fit(X, ys)
+	# clf.fit(X, ys)
 	# alphas = clf.alphas
 	# pos = alphas[0:int(len(alphas) / 2)]
 	# neg = alphas[int(len(alphas) / 2):]
@@ -20,8 +20,8 @@ if __name__ == "__main__":
 	# print(pos_supp, neg_supp)
 	#
 	#
-	# clf2 = SVC(kernel="rbf")
-	# clf2.fit(np.transpose(np.matrix(X)), ys)
+	clf2 = SVC(kernel="rbf")
+	clf2.fit(X, ys)
 	# print(clf2.n_support_)
 
 	# posX_test = np.random.normal(loc=0, scale = 1, size=int(num_samples / 2))

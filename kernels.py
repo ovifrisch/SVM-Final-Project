@@ -6,29 +6,43 @@ class Kernel:
 	"""
 	A class used to peform Kernel computations on pairs of vectors
 	"""
-	def __init__(self, kernel_type, gamma):
+	def __init__(self, kernel_type, gamma, degree=3):
 		"""
 		Parameters
 		----------
 		kernel_type : str
-			The type of kernel function (support for "rbf", "linear", "poly")
+			The type of kernel function (support for "rbf", "linear", "poly", "sgm")
 		gamma : float
 			Kernel coefficient for RBF kernel
+		degree: float
+			Exponent for ploynomial kernel
 		"""
-		self.kernel_type = kernel_type
-		self.gamma = gamma
+		self.__kernel_type = kernel_type
+		self.__gamma = gamma
+		self.__degree = degree
 
 	def apply(self, x1, x2):
 		"""
 		Computes K(x1, x2) depending on kernel_type
 		"""
-		if (self.kernel_type == "rbf"):
+		if (self.__kernel_type == "rbf"):
 			return self.__rbf(x1, x2)
-		elif (self.kernel_type == "linear"):
+		elif (self.__kernel_type == "linear"):
 			return self.__linear(x1, x2)
+		elif (self.__kernel_type == "sgm"):
+			return self.__sigmoid(x1, x2)
+		elif (self.__kernel_type == "poly"):
+			return self.__poly(x1, x2)
 
 	def __linear(self, x1, x2):
-		return np.dot(x1, x2)
+		return np.dot(x1, x2)[0,0]
 
 	def __rbf(self, x1, x2):
-		return math.exp((self.gamma * -1) * pow(np.linalg.norm(x1 - x2), 2))
+		return math.exp((self.__gamma * -1) * pow(np.linalg.norm(x1 - x2), 2))
+
+	# this might be wrong
+	def __sigmoid(self, x1, x2):
+		return np.tanh(self.__gamma * np.dot(x1, x2)[0,0])
+
+	def __poly(self, x1, x2):
+		return pow(np.dot(x1, x2)[0,0] + 1, self.__degree)
