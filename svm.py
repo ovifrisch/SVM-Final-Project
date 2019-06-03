@@ -1,5 +1,6 @@
 import numpy as np
 from kernels import Kernel
+import random
 
 
 
@@ -24,6 +25,7 @@ class svm:
 		"""
 		self.__kernel = Kernel(kernel_type, gamma, degree)
 		self.__C = C
+		self.__tol = 1
 
 	# Accepts X and Y training data and creates the model using SMO
 	def fit(self, X, y):
@@ -50,7 +52,8 @@ class svm:
 		self.__init_Bs()
 
 		# Computationally Intensive SMO
-		self.alphas = self.__sequential_minimal_optimization()
+		self.alphas = [0] * self.__size
+		self.__sequential_minimal_optimization()
 
 		# Extract support vectors and b
 		self.support_vectors, self.support_vector_classes = self.__get_support_vectors()
@@ -87,6 +90,17 @@ class svm:
 		"""
 		Calculates B from the constraint equation using an arbitarary support vector
 		"""
+
+		## https://github.com/LasseRegin/SVM-w-SMO/blob/master/SVM.py
+		## ^^ here it says to take mean of below expression for all support vectors,
+
+		## but in Platt 1998 it says any support vector will do
+
+		# currently sticking with Platt
+
+		# for training
+		if (self.support_vectors.shape[0] == 0):
+			return 0
 		return self.support_vector_classes[0] - self.__sum_w_tranpose_x(self.support_vectors[0, :])
 
 	# need to test this
@@ -168,79 +182,110 @@ class svm:
 			else:
 				self.__Bs.append(0)
 
+	def list_nonzero_non_c(self):
+		res = []
+		for i in range(self.__size):
+			if (self.alphas[i] != 0 and self.alphas[i] != self.__C):
+				res.append(alphas[i])
 
-	def __update_gradient(self, i, j, k, gradients, lamb):
-		"""
-		Implements Line 8 of SMO
-		"""
-		return gradients[k] - (lamb * self.ys[k] * self.__kernel.apply(self.xs[i, :], self.xs[k, :])) + (lamb * self.ys[k] * self.__kernel.apply(self.xs[j, :], self.xs[k, :]))
+		return res
 
-	def __get_lambda(self, i, j, gradients, alphas):
-		"""
-		Implements Line 7 of SMO
-		"""
-		arg1 = self.__Bs[i] - (self.ys[i] * alphas[i])
-		arg2 = (self.ys[j] * alphas[j]) - self.__As[j]
-		yigi = self.ys[i] * gradients[i]
-		yjgj = self.ys[j] * gradients[j]
-		Kii = self.__kernel.apply(self.xs[i, :], self.xs[i, :])
-		Kjj = self.__kernel.apply(self.xs[j, :], self.xs[j, :])
-		Kij = self.__kernel.apply(self.xs[i, :], self.xs[j, :])
-		arg3 = (yigi - yjgj) / (Kii + Kjj - (2*Kij))
-		return min(arg1, min(arg2, arg3))
+	def takeStep(self, i1, i2, E2):
+		if (i1 == i2):
+			return 0
+		alph1 = self.alphas[i1]
+		y1 = self.ys[i1]
+		y2 = self.ys[i2]
+		E1 = self.predict(self.xs[i1, :]) - y1
+		s = y1*y2
+		if (s > 0):
+			L = max(0, self.alphas[i2] - self.alphas[i1])
+			H = min(self.__C, self.__C + self.alphas[i2] - self.alphas[i1])
+		else:
+			L = max(0, self.alphas[i2] + self.alphas[i1] - self.__C)
+			H = min(self.__C, self.alphas[i2] + self.alphas[i1])
+		if (L == H):
+			return 0
+		k11 = self.__kernel.apply(self.xs[i1, :], self.xs[i1, :])
+		k12 = self.__kernel.apply(self.xs[i1, :], self.xs[i2, :])
+		k22 = self.__kernel.apply(self.xs[i2, :], self.xs[i2, :])
+		eta = k11 + k22 - (2*k12)
+		if (eta > 0):
+			a2 = alph2 + ((y2*(E1 - E2))/eta)
+			if (a2 < L):
+				a2 = L
+			elif (a2 > H):
+				a2 = H
+		else:
+			Lobj = 1# objective function at a2=L
+			Hobj = 1# objective function at a2=H
+			if (Lobj < Hobj - self.__eps):
+				a2 = L
+			elif (Lobj < Hobj+self.__eps):
+				a2 = H
+			else:
+				a2 = alph2
 
-	def __get_i(self, gradients, alphas):
-		"""
-		Implements Line 4 of SMO
-		"""
-		temp = list(map(lambda y, g: y*g, self.ys, gradients))
-		max_idx = 0
-		max_el = temp[0]
-		for i in range(len(temp)):
-			if (temp[i] > max_el and self.ys[i]*alphas[i] < self.__Bs[i]):
-				max_el = temp[i]
-				max_idx = i
-		return max_idx
+		if (abs(a2 - alph2) < self.__eps * (a2 + alph2 + self.__eps)):
+			return 0
+		a1 = alph1 + s*(alph2 - a2)
+		# Update threshold to reflect change in Lagrange multipliers
+		# Update weight vector to reflect change in a1 & a2, if SVM is linear
+		# Update weight vector to reflect change in a1 & a2, if SVM is linear
+		self.alphas[i1] = a1
+		self.alphas[i2] = a2
+		return 1
 
 
-	def __get_j(self, gradients, alphas):
-		"""
-		Implements Line 5 of SMO
-		"""
-		temp = list(map(lambda y, g: y*g, self.ys, gradients))
-		min_idx = 0
-		min_el = temp[0]
-		for j in range(len(temp)):
-			if (temp[j] < min_el and self.ys[j]*alphas[j] > self.__As[j]):
-				min_el = temp[j]
-				min_idx = j
-		return min_idx
 
-	def __optimality_criterion(self, i, j, gradients):
-		"""
-		Implements Line 6 of SMO
-		"""
+	def examineExample(self, i2):
+		y2 = self.ys[i2]
+		alph2 = self.alphas[i2]
+		E2 = self.predict(self.xs[i2, :]) - y2
+		r2 = E2*y2
+		if ((r < -self.__tol and alph2 < self.__C) or (r2 > self.__tol and alph2 > 0)):
+			if (len(self.list_nonzero_non_c()) > 1):
+				i1 = 1# reult of second choice heuristic
+				if (self.takeStep(i1, i2)):
+					return 1
+			startIdx1 = random.randint(0, self.__size)
+			for i1 in range(startIdx, self.__size):
+				if (self.alphas[i1] == 0 or self.alphas[i1] == self.__C):
+					continue
+				if (takeStep(i1, i2, E2)):
+					return 1
+			for i1 in range(0, startIdx):
+				if (self.alphas[i1] == 0 or self.alphas[i1] == self.__C):
+					continue
+				if (takeStep(i1, i2, E2)):
+					return 1
 
-		# This is the optimality criterion (11)
-		print(self.ys[i] * gradients[i])
-		print("must be less than")
-		print(self.ys[j] * gradients[j])
-		return (self.ys[i] * gradients[i] <= self.ys[j] * gradients[j])
+			startIdx2 = random.randint(0, self.__size)
+			for i1 in range(startIdx2, self.__size):
+				if (takeStep(i1, i2)):
+					return 1
+			for i1 in range(0, startIdx2):
+				if (takeStep(i1, i2)):
+					return 1
+		return 0
+
+
+
+
+
 
 	def __sequential_minimal_optimization(self):
-		"""
-		This function implements the SMO algorithm from Bottou Lin 2006 (BTL) section 6.3
-		It maximizes the objective function and finds the Lagrange Multipliers (denoted alphas here)
-		"""
-		alphas = [0] * self.__size # Line 1
-		gradients = [1] * self.__size # Line 2
-		while (True):
-			i = self.__get_i(gradients, alphas)
-			j = self.__get_j(gradients, alphas)
-			if (self.__optimality_criterion(i, j, gradients)):
-				return alphas
-			lambda_ = self.__get_lambda(i, j, gradients, alphas)
-			for k in range(self.__size):
-				gradients[k] = self.__update_gradient(i, j, k, gradients, lambda_)
-				alphas[i] = alphas[i] + (self.ys[i] * lambda_) # Line 9
-				alphas[j] = alphas[j] - (self.ys[j] * lambda_) # Line 9
+		numChanged = 0
+		examineAll = 1
+		while (numChanged > 0 or examineAll):
+			if (examineAll):
+				for i in range(self.__size):
+					numChanged += self.examineExample(i)
+			else:
+				for i in range(self.__size):
+					if (self.alphas[i] != 0 and self.alphas[i] != self.__C):
+						numChanged += examineExample(i)
+			if (examineAll == 1):
+				examineAll = 0
+			elif (numChanged == 0):
+				examineAll = 1

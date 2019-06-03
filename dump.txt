@@ -1,0 +1,57 @@
+def __update_gradient(self, i, j, k, gradients, lamb):
+	"""
+	Implements Line 8 of SMO
+	"""
+	return gradients[k] - (lamb * self.ys[k] * self.__kernel.apply(self.xs[i, :], self.xs[k, :])) + (lamb * self.ys[k] * self.__kernel.apply(self.xs[j, :], self.xs[k, :]))
+
+def __get_lambda(self, i, j, gradients, alphas):
+	"""
+	Implements Line 7 of SMO
+	"""
+	arg1 = self.__Bs[i] - (self.ys[i] * alphas[i])
+	arg2 = (self.ys[j] * alphas[j]) - self.__As[j]
+	yigi = self.ys[i] * gradients[i]
+	yjgj = self.ys[j] * gradients[j]
+	Kii = self.__kernel.apply(self.xs[i, :], self.xs[i, :])
+	Kjj = self.__kernel.apply(self.xs[j, :], self.xs[j, :])
+	Kij = self.__kernel.apply(self.xs[i, :], self.xs[j, :])
+	arg3 = (yigi - yjgj) / (Kii + Kjj - (2*Kij))
+	return min(arg1, min(arg2, arg3))
+
+def __get_i(self, gradients, alphas):
+	"""
+	Implements Line 4 of SMO
+	"""
+	temp = list(map(lambda y, g: y*g, self.ys, gradients))
+	max_idx = 0
+	max_el = temp[0]
+	for i in range(len(temp)):
+		if (temp[i] > max_el and self.ys[i]*alphas[i] < self.__Bs[i]):
+			max_el = temp[i]
+			max_idx = i
+	return max_idx
+
+
+def __get_j(self, gradients, alphas):
+	"""
+	Implements Line 5 of SMO
+	"""
+	temp = list(map(lambda y, g: y*g, self.ys, gradients))
+	min_idx = 0
+	min_el = temp[0]
+	for j in range(len(temp)):
+		if (temp[j] < min_el and self.ys[j]*alphas[j] > self.__As[j]):
+			min_el = temp[j]
+			min_idx = j
+	return min_idx
+
+def __optimality_criterion(self, i, j, gradients):
+	"""
+	Implements Line 6 of SMO
+	"""
+
+	# This is the optimality criterion (11)
+	print(self.ys[i] * gradients[i])
+	print("must be less than")
+	print(self.ys[j] * gradients[j])
+	return (self.ys[i] * gradients[i] <= self.ys[j] * gradients[j] + 0.02)
