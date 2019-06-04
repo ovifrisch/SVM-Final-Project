@@ -40,15 +40,19 @@ class SVM_Tester:
 
 	def test(self):
 		start_time = time.time()
-		pred_ys = self.clf.predict(self.test_xs)
+		self.pred_ys = self.clf.predict(self.test_xs)
 		self.test_time = time.time() - start_time
-		acc = np.sum(self.ys==pred_ys) / self.num_samples
-		print_results("Our Accuracy: ", acc, self.train_time, self.test_time)
+
 	def get_training_data(self):
 		return self.train_xs, self.ys
 
 	def get_testing_data(self):
 		return self.test_xs, self.ys
+
+	def get_results(self):
+		acc = np.sum(self.ys==self.pred_ys) / self.num_samples
+		print_results("Our Accuracy: ", acc, self.train_time, self.test_time)
+
 
 def print_results(whos, acc, train_time, test_time):
 	print(whos + str(acc) + "  Train time: " + str(round(train_time, 3)) + "s  Test time: " + str(round(test_time, 3)) + "s")
@@ -58,6 +62,7 @@ if __name__ == "__main__":
 	tester = SVM_Tester(num_dimensions=1, num_samples=100)
 	tester.train()
 	tester.test()
+	tester.get_results()
 
 	# Sci Kit Learn SVM
 	clf2 = SVC(kernel="rbf", C=tester.C, gamma=tester.gamma, tol=tester.tolerance)
