@@ -4,7 +4,7 @@ from sklearn.svm import SVC
 from kernels import Kernel
 from sklearn.utils import shuffle
 
-num_samples = 10
+num_samples = 100
 
 if __name__ == "__main__":
 	clf = svm.svm("rbf", 1, 1)

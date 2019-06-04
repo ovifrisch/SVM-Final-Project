@@ -123,67 +123,34 @@ class svm:
 		# Everything good
 		return True
 
+	def examine_example(self, i1):
+		y1 = self.ys[i1]
+		alph1 = self.alphas[i1]
+
+		if (alph1 > 0 and alph1 < C):
+			E1 = self.error_cache[i1]
+		else:
+			E1 = self.__train_predict(self.xs[i1, :]) - y1
+
+		r1 = y1*E1
+		if ((r1 < -self.__tol and alph1 < self.__C) or (r1 > self.__tol and alph1 > 0)):
+
 
 
 	def __smo(self):
+		num_changed = 0
+		examine_all = 1
 		self.alphas = [0] * self.__size
-		self.__b = 0
-		passes = 0
-		while (passes < self.__max_passes):
-			print("Pass " + str(passes) + "/" + str(self.__max_passes))
-			num_changed_alphas = 0
-			for i in range(self.__size):
-				Ei = self.__train_predict(self.xs[i, :])[0] - self.ys[i]
-				if ((self.ys[i] * Ei < -self.__tol and self.alphas[i] < self.__C) or (self.ys[i] * Ei > self.__tol and self.alphas[i] > 0)):
-					while (True):
-						j = random.randint(0, self.__size - 1)
-						if (j != i):
-							break
-
-					Ej = self.__train_predict(self.xs[j, :])[0] - self.ys[j]
-					alpha_i_old = self.alphas[i]
-					alpha_j_old = self.alphas[j]
-
-					s = self.ys[i] * self.ys[j]
-					if (s > 0):
-						L = max(0, self.alphas[i] + self.alphas[j] - self.__C)
-						H = min(self.__C, self.alphas[i] + self.alphas[j])
-					else:
-						L = max(0, self.alphas[i] - self.alphas[j])
-						H = min(self.__C, self.__C + self.alphas[j] - self.alphas[i])
-					if (L == H):
-						continue
-
-					n = (2*self.__kernel.apply(self.xs[i, :], self.xs[j, :])) - self.__kernel.apply(self.xs[i, :], self.xs[i, :]) - self.__kernel.apply(self.xs[j, :], self.xs[j, :])
-					if (n >= 0):
-						continue
-
-					self.alphas[j] -= (self.ys[j] * (Ei - Ej)) / n
-					if (self.alphas[j] > H):
-						self.alphas[j] = H
-					elif (self.alphas[j] < L):
-						self.alphas[j] = L
-
-
-					if (abs(self.alphas[j] - alpha_j_old) < 0.00001):
-						continue
-
-					self.alphas[i] += s*(alpha_j_old - self.alphas[j])
-					b1 = self.__b - Ei - (self.ys[i] * (self.alphas[i] - alpha_i_old) * self.__kernel.apply(self.xs[i, :], self.xs[i, :])) - (self.ys[j] * (self.alphas[j] - alpha_j_old) * self.__kernel.apply(self.xs[i, :], self.xs[j, :]))
-					b2 = self.__b - Ej - (self.ys[i] * (self.alphas[i] - alpha_i_old) * self.__kernel.apply(self.xs[i, :], self.xs[j, :])) - (self.ys[j] * (self.alphas[j] - alpha_j_old) * self.__kernel.apply(self.xs[j, :], self.xs[j, :]))
-
-					if (self.alphas[i] > 0 and self.alphas[i] < self.__C):
-						self.__b = b1
-					elif (self.alphas[j] > 0 and self.alphas[j] < self.__C):
-						self.__b = b2
-					else:
-						self.__b = (b1 + b2) / 2
-
-					num_changed_alphas  += 1
-				# end if
-			# end for
-
-			if (num_changed_alphas == 0):
-				passes += 1
+		while (num_changed > 0 or examine_all):
+			num_changed = 0
+			if (examine_all):
+				for k in range(self.__size):
+					num_changed += self.examine_example(k)
 			else:
-				passes += 1
+				for k in range(self.__size):
+					if (self.alphas[k] != 0 and self.alphas[k] != self.__C):
+						num_changed += self.examine_example(k)
+			if (examine_all == 1):
+				examine_all = 0
+			elif (num_changed == 0):
+				examine_all = 1
