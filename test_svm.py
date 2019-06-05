@@ -2,6 +2,8 @@ import svm
 import numpy as np
 from sklearn.svm import SVC
 import time
+import multiprocessing as mp
+from sklearn.utils import shuffle
 
 class SVM_Tester:
 	def __init__(self, num_dimensions = 1, num_samples = 100, loc1 = 1, loc2 = 4,
@@ -17,13 +19,21 @@ class SVM_Tester:
 		self.degree = degree
 		self.tolerance = tolerance
 		self.epsilon = epsilon
-		self.train_xs = self.generate_xs()
-		self.test_xs = self.generate_xs()
-		self.ys = np.append(np.ones(int(num_samples / 2)), (-1 * np.ones(int(num_samples / 2))))
-		self.clf = svm.svm(self.kernel, self.C, self.gamma, self.degree, self.tolerance, self.epsilon)
+		self.generate_data()
+
 
 	def __del__(self):
 		pass
+
+	def generate_data(self):
+		self.train_xs = self.generate_xs()
+		self.test_xs = self.generate_xs()
+		self.train_ys = np.append(np.ones(int(self.num_samples / 2)), (-1 * np.ones(int(self.num_samples / 2))))
+		self.test_ys = np.append(np.ones(int(self.num_samples / 2)), (-1 * np.ones(int(self.num_samples / 2))))
+
+		# shuffle the dataset randomly (so not all ones at start and neg ones at end)
+		self.train_xs, self.train_ys = shuffle(self.train_xs, self.train_ys)
+		self.test_xs, self.test_ys = shuffle(self.test_xs, self.test_ys)
 
 	def generate_xs(self):
 		xs = np.zeros((self.num_samples, self.num_dimensions))
@@ -34,25 +44,53 @@ class SVM_Tester:
 			xs[:, i:i+1] = X_i
 		return xs
 
-	def train(self):
-		start_time = time.time()
-		self.clf.fit(self.train_xs, self.ys)
-		self.train_time = time.time() - start_time
+	def train_one(self, start, end):
+		clf = svm.svm(self.kernel, self.C, self.gamma, self.degree, self.tolerance, self.epsilon)
+		xs = self.train_xs[start:end, :]
+		ys = self.train_ys[start:end]
+		clf.fit(xs, ys)
+		self.classifiers.put(clf)
+
+	def train_all(self):
+		num_proc = 4
+		sub_samples = int(self.train_xs.shape[0] / num_proc)
+		self.classifiers = mp.Queue()
+		processes = []
+		for i in range(num_proc):
+			start_idx = i*sub_samples
+			end_idx = start_idx + sub_samples
+			processes.append(mp.Process(target = self.train_one, args=(start_idx, end_idx)))
+
+		for p in processes:
+			p.start()
+
+		for p in processes:
+			p.join()
 
 	def test(self):
-		start_time = time.time()
-		self.pred_ys = self.clf.predict(self.test_xs)
-		self.test_time = time.time() - start_time
+		self.pred_ys = np.zeros((self.test_xs.shape[0]))
+		while (self.classifiers.empty() == False):
+			self.pred_ys += self.classifiers.get().predict(self.test_xs)
+
+		for i in range(self.test_xs.shape[0]):
+			if (self.pred_ys[i] >= 0):
+				self.pred_ys[i] = 1
+			else:
+				self.pred_ys[i] = -1
+		pass
+		# get the predictions of each of the classifiers and assign
+		# to the class with most votes
+		# self.pred_ys = self.clf.predict(self.test_xs)
 
 	def get_training_data(self):
-		return self.train_xs, self.ys
+		return self.train_xs, self.train_ys
 
 	def get_testing_data(self):
-		return self.test_xs, self.ys
+		return self.test_xs, self.test_ys
 
 	def get_results(self):
-		acc = np.sum(self.ys==self.pred_ys) / self.num_samples
-		print_results("Our Accuracy: ", acc, self.train_time, self.test_time)
+		acc = np.sum(self.test_ys==self.pred_ys) / self.num_samples
+		print_results("Our Accuracy: ", acc, 0, 0)
 
 
 def print_results(whos, acc, train_time, test_time):
@@ -60,8 +98,8 @@ def print_results(whos, acc, train_time, test_time):
 
 if __name__ == "__main__":
 	# Our SVM
-	tester = SVM_Tester(num_dimensions=1, num_samples=100)
-	tester.train()
+	tester = SVM_Tester(num_dimensions=1, num_samples=500)
+	tester.train_all()
 	tester.test()
 	tester.get_results()
 
