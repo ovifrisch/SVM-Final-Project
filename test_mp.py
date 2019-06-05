@@ -3,8 +3,7 @@ from multiprocessing import Pool
 
 
 def f(x):
-	return x*x
+	return x[1]
 
-if __name__ == '__main__':
-	p = Pool(5)
-	print(p.map(f, [1, 2, 3]))
+x = [(1, 2), (5, 1)]
+print(sorted(x, key=lambda el: el[0]))

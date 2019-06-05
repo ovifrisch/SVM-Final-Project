@@ -52,11 +52,12 @@ class SVM_Tester:
 		self.classifiers.put(clf)
 
 	def train_all(self):
-		num_proc = 4
-		sub_samples = int(self.train_xs.shape[0] / num_proc)
+		start_time = time.time()
+		num_processes = 5
+		sub_samples = int(self.train_xs.shape[0] / num_processes)
 		self.classifiers = mp.Queue()
 		processes = []
-		for i in range(num_proc):
+		for i in range(num_processes):
 			start_idx = i*sub_samples
 			end_idx = start_idx + sub_samples
 			processes.append(mp.Process(target = self.train_one, args=(start_idx, end_idx)))
@@ -67,20 +68,50 @@ class SVM_Tester:
 		for p in processes:
 			p.join()
 
-	def test(self):
-		self.pred_ys = np.zeros((self.test_xs.shape[0]))
-		while (self.classifiers.empty() == False):
-			self.pred_ys += self.classifiers.get().predict(self.test_xs)
+		self.train_time = time.time() - start_time
 
-		for i in range(self.test_xs.shape[0]):
-			if (self.pred_ys[i] >= 0):
-				self.pred_ys[i] = 1
+	def test_one(self, start, end):
+		pred_ys = np.zeros((end - start))
+		while (self.classifiers.empty() == False):
+			pred_ys += self.classifiers.get().predict(self.test_xs[start:end, :])
+
+		for i in range(end - start):
+			if (pred_ys[i] >= 0):
+				pred_ys[i] = 1
 			else:
-				self.pred_ys[i] = -1
-		pass
+				pred_ys[i] = -1
+
+		self.predictions.put((pred_ys, start, end))
+
+
+	def test_all(self):
+		start_time = time.time()
+		num_processes = 5
+		sub_samples = int(self.test_xs.shape[0] / num_processes)
+		self.predictions = mp.Queue()
+		processes = []
+		for i in range(num_processes):
+			start_idx = i*sub_samples
+			end_idx = start_idx + sub_samples
+			processes.append(mp.Process(target = self.test_one, args=(start_idx, end_idx)))
+
+		for p in processes:
+			p.start()
+
+		for p in processes:
+			p.join()
+
+		preds = []
+		while (self.predictions.empty() == False):
+			preds.append(self.predictions.get())
+
+		# sort by starting index
+		preds = sorted(preds, key=lambda pred: pred[1])
+		self.pred_ys = np.concatenate([pred[0] for pred in preds])
 		# get the predictions of each of the classifiers and assign
 		# to the class with most votes
 		# self.pred_ys = self.clf.predict(self.test_xs)
+		self.test_time = time.time() - start_time
 
 	def get_training_data(self):
 		return self.train_xs, self.train_ys
@@ -90,7 +121,7 @@ class SVM_Tester:
 
 	def get_results(self):
 		acc = np.sum(self.test_ys==self.pred_ys) / self.num_samples
-		print_results("Our Accuracy: ", acc, 0, 0)
+		print_results("Our Accuracy: ", acc, self.train_time, self.test_time)
 
 
 def print_results(whos, acc, train_time, test_time):
@@ -98,9 +129,9 @@ def print_results(whos, acc, train_time, test_time):
 
 if __name__ == "__main__":
 	# Our SVM
-	tester = SVM_Tester(num_dimensions=1, num_samples=500)
+	tester = SVM_Tester(num_dimensions=3, num_samples=500)
 	tester.train_all()
-	tester.test()
+	tester.test_all()
 	tester.get_results()
 
 	# Sci Kit Learn SVM
