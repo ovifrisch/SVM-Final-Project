@@ -21,6 +21,7 @@ class SVM_Tester:
 		self.test_xs = self.generate_xs()
 		self.ys = np.append(np.ones(int(num_samples / 2)), (-1 * np.ones(int(num_samples / 2))))
 		self.clf = svm.svm(self.kernel, self.C, self.gamma, self.degree, self.tolerance, self.epsilon)
+
 	def __del__(self):
 		pass
 
