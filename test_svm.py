@@ -120,6 +120,8 @@ class SVM_Tester:
 		return self.test_xs, self.test_ys
 
 	def get_results(self):
+		print(self.pred_ys)
+		print(self.test_ys)
 		acc = np.sum(self.test_ys==self.pred_ys) / self.num_samples
 		print_results("Our Accuracy: ", acc, self.train_time, self.test_time)
 
@@ -129,7 +131,7 @@ def print_results(whos, acc, train_time, test_time):
 
 if __name__ == "__main__":
 	# Our SVM
-	tester = SVM_Tester(num_dimensions=3, num_samples=500)
+	tester = SVM_Tester(num_dimensions=2, num_samples=100)
 	tester.train_all()
 	tester.test_all()
 	tester.get_results()

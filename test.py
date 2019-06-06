@@ -1,9 +1,5 @@
 
 
-def add(x1, x2):
-	return x1 + x2
-
-
-if (1):
-	a = 2
-print(a)
+x = [(1, "house"), (2, "bird")]
+for idx, (num, str_) in enumerate(x):
+	print(idx, num, str_)

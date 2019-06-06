@@ -15,19 +15,75 @@ class svm:
 
 	# Accepts X and Y training data and creates the model using SMO
 	def fit(self, X, y):
-
+		self.num_classes = np.unique(y).shape[0]
 		self.xs = X
-		self.ys = y
 		self.__size = X.shape[0]
-
-		# Computationally Intensive SMO
 		self.alphas = [0] * self.__size
 		self.__b = 0
+
+		# multiclass
+		if (self.num_classes > 2):
+			self.multiclass_fit(X, y)
+			return
+		self.ys = y
+
+		# Computationally Intensive SMO
 		self.__sequential_minimal_optimization()
+
+
+	# train one v all
+	# assuming the classes start from 0, 1, 2, ...
+	def multiclass_fit(self, X, y):
+		new_ys = []
+		# generate ys for each classifier
+		for i in range(self.num_classes):
+			new_y = np.copy(y)
+			for j in range(y.shape[0]):
+				if (new_y[j] == i):
+					new_y[j] = 1
+				else:
+					new_y[j] = -1
+			new_ys.append(new_y)
+
+		# train each classifier
+		self.multiclass_models = []
+		for i in range(self.num_classes):
+			self.ys = new_ys[i]
+			print(self.xs)
+			print(self.ys)
+			self.__sequential_minimal_optimization()
+			self.multiclass_models.append((self.alphas, self.__b))
+
+			# reset model paramters for next classifier
+			self.alphas = [0] * self.__size
+			self.__b = 0
+
+	def predict_multiclass(self, xs):
+		preds = np.zeros(xs.shape)
+
+		for i in range(xs.shape[0]):
+			x = xs[i]
+			votes = [0] * self.num_classes
+			for idx, (alpha, b) in self.multiclass_models:
+				self.alphas = alpha
+				self.__b = b
+				decision = np.sign(self.__sum_w_tranpose_x(x) - self.__b)
+				if (decision == 1):
+					# add 1 vote to this class
+					votes[idx] += 1
+				else:
+					# add 1 vote to all other classes
+					votes = [x+1 for x in votes]
+					votes[idx] -= 1
+			preds[i] = np.argmax(votes)
+		return preds
+
 
 	# Accepts a list of testing samples and returns the predicted classes
 	# Modeled after discriminant function in (6)
 	def predict(self, xs):
+		if (self.num_classes > 2):
+			return self.predict_multiclass(xs)
 		preds = np.zeros((xs.shape[0])) # predictions
 		for i in range(xs.shape[0]):
 			x = xs[i]
@@ -180,7 +236,7 @@ class svm:
 			else:
 				for i in range(self.__size):
 					if (self.alphas[i] != 0 and self.alphas[i] != self.__C):
-						numChanged += examineExample(i)
+						numChanged += self.examineExample(i)
 			if (examineAll == 1):
 				examineAll = 0
 			elif (numChanged == 0):

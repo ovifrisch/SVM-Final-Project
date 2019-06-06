@@ -1,0 +1,21 @@
+
+
+one vs all:
+if there are L classes, then train L classifiers.
+Each classifier will do binary classification between one class and the rest of the classes
+Assume classes A, B, C
+For each classifier, need to modify dataset so that if we are building a classifier for A vs rest, all As will have class = 1, and the rest will have -1
+											B vs rest, all Bs will have class = 1, and the rest will have -1
+											C vs rest, all Cs will have class = 1, and the rest will have -1
+
+
+Given a testing example xi, we run it through each of the classifiers.
+Say the first classifier is A vs rest (clfA), then if clfA classifies xi as 1, we increment the number of "votes" for A by 1
+					           if clfA classifies xi as -1, we increment the number of "votes" for B and C by 1
+
+After running each classifier on xi, we assign xi to the class with the most votes.
+
+
+
+
+one vs one
