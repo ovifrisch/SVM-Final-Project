@@ -120,8 +120,6 @@ class SVM_Tester:
 		return self.test_xs, self.test_ys
 
 	def get_results(self):
-		print(self.pred_ys)
-		print(self.test_ys)
 		acc = np.sum(self.test_ys==self.pred_ys) / self.num_samples
 		print_results("Our Accuracy: ", acc, self.train_time, self.test_time)
 

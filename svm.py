@@ -34,7 +34,7 @@ class svm:
 	# train one v all
 	# assuming the classes start from 0, 1, 2, ...
 	def multiclass_fit(self, X, y):
-		new_ys = []
+		self.new_ys = []
 		# generate ys for each classifier
 		for i in range(self.num_classes):
 			new_y = np.copy(y)
@@ -43,14 +43,12 @@ class svm:
 					new_y[j] = 1
 				else:
 					new_y[j] = -1
-			new_ys.append(new_y)
+			self.new_ys.append(new_y)
 
 		# train each classifier
 		self.multiclass_models = []
 		for i in range(self.num_classes):
-			self.ys = new_ys[i]
-			print(self.xs)
-			print(self.ys)
+			self.ys = self.new_ys[i]
 			self.__sequential_minimal_optimization()
 			self.multiclass_models.append((self.alphas, self.__b))
 
@@ -59,14 +57,15 @@ class svm:
 			self.__b = 0
 
 	def predict_multiclass(self, xs):
-		preds = np.zeros(xs.shape)
+		preds = np.zeros((xs.shape[0]))
 
 		for i in range(xs.shape[0]):
 			x = xs[i]
 			votes = [0] * self.num_classes
-			for idx, (alpha, b) in self.multiclass_models:
+			for idx, (alpha, b) in enumerate(self.multiclass_models):
 				self.alphas = alpha
 				self.__b = b
+				self.ys = self.new_ys[idx]
 				decision = np.sign(self.__sum_w_tranpose_x(x) - self.__b)
 				if (decision == 1):
 					# add 1 vote to this class
@@ -82,6 +81,7 @@ class svm:
 	# Accepts a list of testing samples and returns the predicted classes
 	# Modeled after discriminant function in (6)
 	def predict(self, xs):
+
 		if (self.num_classes > 2):
 			return self.predict_multiclass(xs)
 		preds = np.zeros((xs.shape[0])) # predictions
@@ -89,6 +89,9 @@ class svm:
 			x = xs[i]
 			preds[i] = np.sign(self.__sum_w_tranpose_x(x) - self.__b)
 		return preds
+
+	def predict_training(self, x):
+		return np.sign(self.__sum_w_tranpose_x(x) - self.__b)
 
 	def __sum_w_tranpose_x(self, x):
 		kernel_vector = np.apply_along_axis(self.__kernel.apply, 1, self.xs, x2=x)
@@ -198,7 +201,7 @@ class svm:
 	def examineExample(self, i2):
 		y2 = self.ys[i2]
 		alph2 = self.alphas[i2]
-		E2 = self.predict(self.xs[i2, :])[0] - y2
+		E2 = self.predict_training(self.xs[i2, :]) - y2
 		r2 = E2*y2
 		if ((r2 < -self.__tol and alph2 < self.__C) or (r2 > self.__tol and alph2 > 0)):
 			i1 = self.__second_choice_heuristic(E2)
