@@ -61,6 +61,8 @@ class SVM:
 
 		for i in range(xs.shape[0]):
 			x = xs[i]
+
+			
 			votes = [0] * self.num_classes
 			for idx, (alpha, b) in enumerate(self.multiclass_models):
 				self.alphas = alpha

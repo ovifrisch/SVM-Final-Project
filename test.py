@@ -1,4 +1,8 @@
+import numpy as np
 
 
-for i in (list(range(0, 3)) + list(range(0, 3))):
-	print(i)
+x = np.ones(10)
+x[2] = 2
+i = 2
+f = lambda x: x+2
+print(f(x))

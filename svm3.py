@@ -286,6 +286,7 @@ class SVM:
 		else:
 			kernel_vector = np.apply_along_axis(self.__kernel.eval, 1, self.__xs, x2=x)
 
+	
 		return np.sum(np.multiply(kernel_vector, self.__ys, self.__alphas)) - self.__b
 
 

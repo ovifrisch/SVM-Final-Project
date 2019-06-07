@@ -31,7 +31,8 @@ class SVM_Tester:
 		self.test_xs = self.generate_xs()
 		self.train_ys = np.append(np.ones(int(self.num_samples / 2)), (-1 * np.ones(int(self.num_samples / 2))))
 		self.test_ys = np.append(np.ones(int(self.num_samples / 2)), (-1 * np.ones(int(self.num_samples / 2))))
-
+		print(self.train_xs.shape)
+		print(self.train_ys.shape)
 		# shuffle the dataset randomly (so not all ones at start and neg ones at end)
 		self.train_xs, self.train_ys = shuffle(self.train_xs, self.train_ys)
 		self.test_xs, self.test_ys = shuffle(self.test_xs, self.test_ys)
@@ -46,7 +47,7 @@ class SVM_Tester:
 		return xs
 
 	def train_one(self, start, end):
-		clf = svm.SVM(self.kernel, self.C, self.gamma, self.degree, self.tolerance, self.epsilon)
+		clf = svm2.SVM(self.kernel, self.C, self.gamma, self.degree, self.tolerance, self.epsilon)
 		xs = self.train_xs[start:end, :]
 		ys = self.train_ys[start:end]
 		clf.fit(xs, ys)
@@ -56,7 +57,8 @@ class SVM_Tester:
 		start_time = time.time()
 		num_processes = 5
 		sub_samples = int(self.train_xs.shape[0] / num_processes)
-		self.classifiers = mp.Queue()
+		mananger = mp.Manager()
+		self.classifiers = mananger.Queue()
 		processes = []
 		for i in range(num_processes):
 			start_idx = i*sub_samples
@@ -68,7 +70,6 @@ class SVM_Tester:
 
 		for p in processes:
 			p.join()
-
 
 		self.train_time = time.time() - start_time
 
@@ -86,12 +87,12 @@ class SVM_Tester:
 
 		self.predictions.put((pred_ys, start, end))
 
-
 	def test_all(self):
 		start_time = time.time()
 		num_processes = 5
 		sub_samples = int(self.test_xs.shape[0] / num_processes)
-		self.predictions = mp.Queue()
+		mananger = mp.Manager()
+		self.predictions = mananger.Queue()
 		processes = []
 		for i in range(num_processes):
 			start_idx = i*sub_samples
@@ -132,7 +133,7 @@ def print_results(whos, acc, train_time, test_time):
 
 if __name__ == "__main__":
 	# Our SVM
-	tester = SVM_Tester(num_dimensions=13, num_samples=500)
+	tester = SVM_Tester(num_dimensions=10, num_samples=100)
 	tester.train_all()
 	tester.test_all()
 	tester.get_results()
