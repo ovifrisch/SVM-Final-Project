@@ -21,7 +21,7 @@ class Kernel:
 		self.__gamma = gamma
 		self.__degree = degree
 
-	def apply(self, x1, x2):
+	def eval(self, x1, x2):
 		"""
 		Computes K(x1, x2) depending on kernel_type
 		"""

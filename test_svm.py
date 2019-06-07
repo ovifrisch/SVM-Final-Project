@@ -1,3 +1,4 @@
+import svm2
 import svm
 import numpy as np
 from sklearn.svm import SVC
@@ -45,7 +46,7 @@ class SVM_Tester:
 		return xs
 
 	def train_one(self, start, end):
-		clf = svm.svm(self.kernel, self.C, self.gamma, self.degree, self.tolerance, self.epsilon)
+		clf = svm.SVM(self.kernel, self.C, self.gamma, self.degree, self.tolerance, self.epsilon)
 		xs = self.train_xs[start:end, :]
 		ys = self.train_ys[start:end]
 		clf.fit(xs, ys)
@@ -68,7 +69,9 @@ class SVM_Tester:
 		for p in processes:
 			p.join()
 
+
 		self.train_time = time.time() - start_time
+
 
 	def test_one(self, start, end):
 		pred_ys = np.zeros((end - start))
@@ -129,7 +132,7 @@ def print_results(whos, acc, train_time, test_time):
 
 if __name__ == "__main__":
 	# Our SVM
-	tester = SVM_Tester(num_dimensions=2, num_samples=100)
+	tester = SVM_Tester(num_dimensions=13, num_samples=500)
 	tester.train_all()
 	tester.test_all()
 	tester.get_results()

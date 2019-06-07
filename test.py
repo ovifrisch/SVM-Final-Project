@@ -1,5 +1,4 @@
 
 
-x = [(1, "house"), (2, "bird")]
-for idx, (num, str_) in enumerate(x):
-	print(idx, num, str_)
+for i in (list(range(0, 3)) + list(range(0, 3))):
+	print(i)

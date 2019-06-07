@@ -4,7 +4,7 @@ import random
 
 
 
-class svm:
+class SVM:
 
 	def __init__(self, kernel_type='rbf', C=1, gamma=1, degree=3, tolerance=0.1, epsilon=0.1):
 		self.__kernel = Kernel(kernel_type, gamma, degree)
@@ -18,7 +18,7 @@ class svm:
 		self.num_classes = np.unique(y).shape[0]
 		self.xs = X
 		self.__size = X.shape[0]
-		self.alphas = [0] * self.__size
+		self.alphas = np.zeros(self.__size)
 		self.__b = 0
 
 		# multiclass
@@ -53,7 +53,7 @@ class svm:
 			self.multiclass_models.append((self.alphas, self.__b))
 
 			# reset model paramters for next classifier
-			self.alphas = [0] * self.__size
+			self.alphas = np.zeros(self.__size)
 			self.__b = 0
 
 	def predict_multiclass(self, xs):
@@ -94,7 +94,8 @@ class svm:
 		return np.sign(self.__sum_w_tranpose_x(x) - self.__b)
 
 	def __sum_w_tranpose_x(self, x):
-		kernel_vector = np.apply_along_axis(self.__kernel.apply, 1, self.xs, x2=x)
+		kernel_vector = np.apply_along_axis(self.__kernel.eval, 1, self.xs, x2=x)
+		# return np.sum(np.multiply(kernel_vector, self.ys, self.alphas))
 		zipped = zip(kernel_vector, self.ys, self.alphas)
 		products = [np.prod(tup) for tup in zipped]
 		return sum(products)
@@ -124,16 +125,20 @@ class svm:
 			H = min(self.__C, self.__C + self.alphas[i2] - self.alphas[i1])
 		if (L == H):
 			return 0
-		k11 = self.__kernel.apply(self.xs[i1, :], self.xs[i1, :])
-		k12 = self.__kernel.apply(self.xs[i1, :], self.xs[i2, :])
-		k22 = self.__kernel.apply(self.xs[i2, :], self.xs[i2, :])
+		k11 = self.__kernel.eval(self.xs[i1, :], self.xs[i1, :])
+		k12 = self.__kernel.eval(self.xs[i1, :], self.xs[i2, :])
+		k22 = self.__kernel.eval(self.xs[i2, :], self.xs[i2, :])
 		eta = k11 + k22 - (2*k12)
 		if (eta > 0):
+			# optimum value for a2
 			a2 = alph2 + ((y2*(E1 - E2))/eta)
 			if (a2 < L):
 				a2 = L
 			elif (a2 > H):
 				a2 = H
+
+		# eta is equal to 0,so we can't get the optimum for a2
+		# settle for setting it to the max of the endpoints of the constraint line
 		else:
 			f1 = (y1*(E1 + self.__b)) - (self.alphas[i1]*k11) - (s*self.alphas[i2]*k12)
 			f2 = (y2*(E2 + self.__b)) - (s*self.alphas[i1]*k12) - (self.alphas[i2]*k22)
@@ -175,7 +180,7 @@ class svm:
 
 		for i in range(self.__size):
 			if (self.alphas[i] > 0 and self.alphas[i] < self.__C):
-				self.__error_cache[i] += t1 * self.__kernel.apply(self.xs[i1, :], self.xs[i, :]) + t2 * self.__kernel.apply(self.xs[i2, :], self.xs[i, :]) - delta_b
+				self.__error_cache[i] += t1 * self.__kernel.eval(self.xs[i1, :], self.xs[i, :]) + t2 * self.__kernel.eval(self.xs[i2, :], self.xs[i, :]) - delta_b
 
 		self.__error_cache[i1] = 0
 		self.__error_cache[i2] = 0
@@ -207,21 +212,13 @@ class svm:
 			i1 = self.__second_choice_heuristic(E2)
 			if (self.takeStep(i1, i2, E2)):
 				return 1
-			startIdx1 = random.randint(0, self.__size)
-			for i1 in range(startIdx1, self.__size):
-				if (self.alphas[i1] > 0 and self.alphas[i1] < self.__C):
-					if (self.takeStep(i1, i2, E2)):
-						return 1
-			for i1 in range(0, startIdx1):
+			idx = random.randint(0, self.__size)
+			for i1 in list(range(idx, self.__size)) + list(range(0, idx)):
 				if (self.alphas[i1] > 0 and self.alphas[i1] < self.__C):
 					if (self.takeStep(i1, i2, E2)):
 						return 1
 
-			startIdx2 = random.randint(0, self.__size)
-			for i1 in range(startIdx2, self.__size):
-				if (self.takeStep(i1, i2, E2)):
-					return 1
-			for i1 in range(0, startIdx2):
+			for i1 in list(range(idx, self.__size)) + list(range(0, idx)):
 				if (self.takeStep(i1, i2, E2)):
 					return 1
 		return 0
