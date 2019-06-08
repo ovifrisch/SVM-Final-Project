@@ -214,6 +214,8 @@ class SVM:
 			for i1 in list(range(idx, self.__size)) + list(range(0, idx)):
 				if (self.__takeStep(i1, i2, E2)):
 					return 1
+		
+
 		return 0
 
 	def __smo(self):
@@ -240,12 +242,7 @@ class SVM:
 
 		# Store errors to speed up algorithm
 		self.__initialize_error_cache()
-		steps = 0
 		while (num_changed > 0 or examine_all):
-			print("Num changed: " + str(num_changed))
-			steps += 1
-			if (steps > 10):
-				return self.__alphas, self.__b
 			num_changed = 0
 			if (examine_all):
 
@@ -264,6 +261,7 @@ class SVM:
 
 			elif (num_changed == 0):
 				examine_all = 1
+
 
 		return self.__alphas, self.__b
 
@@ -291,7 +289,9 @@ class SVM:
 		else:
 			kernel_vector = np.apply_along_axis(self.__kernel.eval, 1, self.__xs, x2=x)
 
-		return np.sum(np.multiply(kernel_vector, self.__ys, self.__alphas)) - self.__b
+		
+		ret = np.sum(kernel_vector * self.__ys *self.__alphas) - self.__b
+		return ret
 
 
 	def predict(self, xs):

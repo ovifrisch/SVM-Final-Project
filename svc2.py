@@ -86,6 +86,8 @@ class SVC:
 		else:
 			self.__y_mat = self.get_y_matrix()
 
+		
+
 		# train each of the classifiers serially
 		self.__classifiers = []
 		for i in range(self.__num_classes):
@@ -132,11 +134,27 @@ class SVC:
 if __name__ == "__main__":
 
 	# BINARY
-	num_samples = 500
-	pos = np.random.normal(loc=0, scale = 1, size=int(num_samples/2))
-	neg = np.random.normal(loc=5, scale = 1, size=int(num_samples/2))
-	xs = np.transpose(np.matrix(np.append(pos, neg)))
-	ys = np.append(np.ones(int(num_samples/2)), -1*np.ones(int(num_samples/2)))
+	# num_samples = 500
+	# pos = np.random.normal(loc=0, scale = 1, size=int(num_samples/2))
+	# neg = np.random.normal(loc=5, scale = 1, size=int(num_samples/2))
+	# xs = np.transpose(np.matrix(np.append(pos, neg)))
+	# ys = np.append(np.ones(int(num_samples/2)), -1*np.ones(int(num_samples/2)))
+	# xs, ys = shuffle(xs, ys)
+	# s = SVC()
+	# s.fit(xs, ys)
+	# print("done training")
+	# preds = s.predict(xs)
+	# acc = np.sum(preds == ys) / num_samples
+	# print(acc)
+
+
+	# MULTICLASS
+	num_samples = 200
+	one = np.random.normal(loc=0, scale = 1, size=int(num_samples/3))
+	two = np.random.normal(loc=5, scale = 1, size=int(num_samples/3))
+	three = np.random.normal(loc=10, scale = 1, size=int(num_samples/3))
+	xs = np.transpose(np.matrix(np.append(np.append(one, two), three)))
+	ys = np.append(np.append(np.zeros((int(num_samples/3))), np.ones((int(num_samples/3)))), np.ones(int(num_samples / 3)) + 1)
 	xs, ys = shuffle(xs, ys)
 	s = SVC()
 	s.fit(xs, ys)
@@ -144,18 +162,3 @@ if __name__ == "__main__":
 	preds = s.predict(xs)
 	acc = np.sum(preds == ys) / num_samples
 	print(acc)
-
-
-	# MULTICLASS
-	# num_samples = 450
-	# one = np.random.normal(loc=0, scale = 1, size=int(num_samples/3))
-	# two = np.random.normal(loc=5, scale = 1, size=int(num_samples/3))
-	# three = np.random.normal(loc=10, scale = 1, size=int(num_samples/3))
-	# xs = np.transpose(np.matrix(np.append(np.append(one, two), three)))
-	# ys = np.append(np.append(np.zeros((int(num_samples/3))), np.ones((int(num_samples/3)))), np.ones(int(num_samples / 3)) + 1)
-	# xs, ys = shuffle(xs, ys)
-	# s = SVC()
-	# s.fit(xs, ys)
-	# preds = s.predict(xs)
-	# acc = np.sum(preds == ys) / num_samples
-	# print(acc)

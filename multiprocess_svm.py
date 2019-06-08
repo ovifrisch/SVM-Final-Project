@@ -32,9 +32,7 @@ class MP_SVM:
 		clf = SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__solver)
 		xs = self.__xs[start:end, :]
 		ys = self.__ys[start:end]
-		print("one")
 		clf.fit(xs, ys)
-		print("two")
 		self.__shared_classifiers.put(clf)
 
 	def fit(self, x, y):
