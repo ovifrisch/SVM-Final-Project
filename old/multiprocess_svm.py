@@ -1,4 +1,4 @@
-from svm import SVM
+from svm2 import SVM
 from kernels import Kernel
 import numpy as np
 import multiprocessing as mp
@@ -14,8 +14,8 @@ class MP_SVM:
 	C=1,
 	gamma=1,
 	degree=3,
-	tolerance=0.1,
-	epsilon=0.1,
+	tolerance=0.001,
+	epsilon=0.001,
 	solver = "smo"
 	):
 		self.__kernel_type = "rbf"
@@ -28,14 +28,11 @@ class MP_SVM:
 		self.__solver = solver
 
 	def __fit_one(self, start, end):
-
 		clf = SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__solver)
 		xs = self.__xs[start:end, :]
 		ys = self.__ys[start:end]
-		print("one")
 		clf.fit(xs, ys)
-		print("two")
-		self.__shared_classifiers.put(clf)
+		self.__classifiers.put(clf)
 
 	def fit(self, x, y):
 		self.__xs = x
@@ -43,7 +40,7 @@ class MP_SVM:
 		num_processes = 5
 		sub_samples = int(self.__xs.shape[0] / num_processes)
 		manager = mp.Manager()
-		self.__shared_classifiers = manager.Queue()
+		self.__classifiers = manager.Queue()
 		processes = []
 
 		for i in range(num_processes):
@@ -57,20 +54,10 @@ class MP_SVM:
 		for p in processes:
 			p.join()
 
-
-		# save the classifiers
-		self.__classifiers = []
-		while (self.__shared_classifiers.empty() == False):
-			self.__classifiers.append(self.__shared_classifiers.get())
-
-
 	def predict_one(self, start, end):
 		pred_ys = np.zeros((end - start))
-		for clf in self.__classifiers:
-			pred_ys += clf.predict(self.test_xs[start:end, :])
-		# while (self.__classifiers.empty() == False):
-		# 	print("hey")
-		# 	pred_ys += self.__classifiers.get().predict(self.test_xs[start:end, :])
+		while (self.__classifiers.empty() == False):
+			pred_ys += self.__classifiers.get().predict(self.test_xs[start:end, :])
 
 		for i in range(end - start):
 			if (pred_ys[i] >= 0):

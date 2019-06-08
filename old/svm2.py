@@ -32,8 +32,8 @@ class SVM:
 	C=1,
 	gamma=1,
 	degree=3,
-	tolerance=0.1,
-	epsilon=0.1,
+	tolerance=0.001,
+	epsilon=0.001,
 	solver = "smo"
 	):
 		self.__kernel = Kernel(kernel_type, gamma, degree)
@@ -240,12 +240,7 @@ class SVM:
 
 		# Store errors to speed up algorithm
 		self.__initialize_error_cache()
-		steps = 0
 		while (num_changed > 0 or examine_all):
-			print("Num changed: " + str(num_changed))
-			steps += 1
-			if (steps > 10):
-				return self.__alphas, self.__b
 			num_changed = 0
 			if (examine_all):
 
