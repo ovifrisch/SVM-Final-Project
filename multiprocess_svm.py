@@ -27,27 +27,29 @@ class MP_SVM:
 		self.__eps = epsilon
 		self.__solver = solver
 
-	def __fit_one(self, start, end):
+	def __fit_one(self, start, end, shared_classifiers):
 
 		clf = SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__solver)
 		xs = self.__xs[start:end, :]
 		ys = self.__ys[start:end]
 		clf.fit(xs, ys)
-		self.__shared_classifiers.put(clf)
+		shared_classifiers.put(clf)
 
 	def fit(self, x, y):
 		self.__xs = x
 		self.__ys = y
+
+
 		num_processes = 5
 		sub_samples = int(self.__xs.shape[0] / num_processes)
 		manager = mp.Manager()
-		self.__shared_classifiers = manager.Queue()
+		shared_classifiers = manager.Queue()
 		processes = []
 
 		for i in range(num_processes):
 			start_idx = i*sub_samples
 			end_idx = start_idx + sub_samples
-			processes.append(mp.Process(target = self.__fit_one, args=(start_idx, end_idx)))
+			processes.append(mp.Process(target = self.__fit_one, args=(start_idx, end_idx, shared_classifiers)))
 
 		for p in processes:
 			p.start()
@@ -58,8 +60,8 @@ class MP_SVM:
 
 		# save the classifiers
 		self.__classifiers = []
-		while (self.__shared_classifiers.empty() == False):
-			self.__classifiers.append(self.__shared_classifiers.get())
+		while (shared_classifiers.empty() == False):
+			self.__classifiers.append(shared_classifiers.get())
 
 
 	def predict_one(self, start, end):

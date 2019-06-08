@@ -43,7 +43,7 @@ class SVC:
 			y_mat[:, i] = this_y
 		return y_mat
 
-	def __train_one(self, i):
+	def __train_one(self, i, shared_classifiers):
 		"""
 		Parameters:
 		-----------
@@ -57,7 +57,7 @@ class SVC:
 		y = self.__y_mat[:, i]
 		clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__solver)
 		clf.fit(self.__xs, y)
-		self.__classifiers.put((i, clf))
+		shared_classifiers.put((i, clf))
 
 	def fit(self, x, y):
 		"""
@@ -71,34 +71,49 @@ class SVC:
 		Returns:
 		self : obj
 
-		assume classes are 0...N
+		Assumptions:
+		If there are only two classes, we assume they are labeled -1 and 1
+		If there are more than two classes, we assume they are labeled 0, 1, 2, etc...
+		Also assuming max 5 classes (because one process per sub_classifier, and mp can only handle 5?)
 		"""
-		# build a classifier for each class
+
 		self.__size = x.shape[0]
 		self.__num_classes = np.unique(y).shape[0]
 		self.__xs = x
 		self.__ys = y
+		self.__ovr_classifiers = [] # "One v. Rest" Classifiers
 
-		# y_mat is the matrix where each column are the class labels for each of the N classifiers
+		# Only 2 classes, so classify the usual way
 		if (self.__num_classes <= 2):
-			self.__y_mat = y
-
-		else:
-			self.__y_mat = self.get_y_matrix()
-
-		
-
-		# train each of the classifiers serially
-		self.__classifiers = []
-		for i in range(self.__num_classes):
 			clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__solver)
-			if (self.__num_classes == 2):
-				clf.fit(self.__xs, self.__y_mat)
-				self.__classifiers.append(clf)
-				break
-			clf.fit(self.__xs, self.__y_mat[:, i])
-			self.__classifiers.append(clf)
+			clf.train(self.__xs, y)
+			self.__ovr_classifiers = [(0, clf)]
+			return
 
+		# More than 2 classes. First need to get the y labels for each classifier
+		self.__y_mat = self.get_y_matrix()
+
+
+		# set up interprocess communication
+		manager = mp.Manager()
+		shared_classifiers = manager.Queue()
+		processes = []
+
+		# Create 1 process for each ovr classification task
+		for i in range(self.__num_classes):
+			processes.append(mp.Process(target=self.__train_one, args=(i,shared_classifiers)))
+
+		# Start each process
+		for p in processes:
+			p.start()
+
+		# Wait for them to finish
+		for p in processes:
+			p.join()
+
+		# Collect the classifiers from the queue
+		while (shared_classifiers.empty() == False):
+			self.__ovr_classifiers.append(shared_classifiers.get())
 
 
 
@@ -117,16 +132,17 @@ class SVC:
 			- predictions for each input vector
 		"""
 		class_predictions = np.zeros((xs.shape[0], self.__num_classes))
-		for i in range(len(self.__classifiers)):
-			preds = self.__classifiers[i].predict(x)
+		for i in range(len(self.__ovr_classifiers)):
+			preds = self.__ovr_classifiers[i][1].predict(x)
+			label = self.__ovr_classifiers[i][0]
 			if (self.__num_classes == 2):
 				return preds
 			for j in range(preds.shape[0]):
 				if (preds[j] == 1):
-					class_predictions[j, i] += 1
+					class_predictions[j, label] += 1
 				else:
-					class_predictions[j, :] += 1
-					class_predictions[j, i] -= 1
+					class_predictions[j, label] += 1
+					class_predictions[j, label] -= 1
 		return np.argmax(class_predictions, 1)
 
 
