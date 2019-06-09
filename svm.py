@@ -68,6 +68,10 @@ class SVM:
 		# Get the alphas and b from smo
 
 		self.__alphas, self.__b = self.__solve(self.__solver)
+		supp_idxs = np.nonzero(self.__alphas)[0]
+		self.__supp_x = np.take(self.__xs, supp_idxs, axis=0)
+		self.__supp_y = np.take(self.__ys, supp_idxs)
+		self.__supp_a = np.take(self.__alphas, supp_idxs)
 
 	def __get_kernel_matrix(self):
 		"""
@@ -245,7 +249,6 @@ class SVM:
 		while (num_changed > 0 or examine_all):
 			num_changed = 0
 			if (examine_all):
-
 				# loop over entire training set
 				for i in range(self.__size):
 					num_changed += self.__examine_example(i)
@@ -286,25 +289,25 @@ class SVM:
 		"""
 		if (idx != None):
 			kernel_vector = self.__KM[idx, :]
+			return np.sum(kernel_vector * self.__ys *self.__alphas) - self.__b
 		else:
-			kernel_vector = np.apply_along_axis(self.__kernel.eval, 1, self.__xs, x2=x)
-
-		
-		ret = np.sum(kernel_vector * self.__ys *self.__alphas) - self.__b
-		return ret
+			kernel_vector = np.apply_along_axis(self.__kernel.eval, 1, self.__supp_x, x2=x)
+			mult = kernel_vector * self.__supp_y, * self.__supp_a
+			return np.sum(mult[0]) - self.__b
 
 
 	def predict(self, xs):
-		preds = np.zeros((xs.shape[0])) # predictions
-		for i in range(xs.shape[0]):
-			x = xs[i]
-			preds[i] = np.sign(self.__u(x=x))
-		return preds
+
+		def sign(x):
+			return np.sign(self.__u(x=x))
+
+		start = time.time()
+		ret = np.apply_along_axis(sign, 1, xs)
+		print(time.time() - start)
+		return ret
+
 
 	def predict_accuracy(self, xs, ys):
-		preds = np.zeros((xs.shape[0])) # predictions
-		for i in range(xs.shape[0]):
-			x = xs[i]
-			preds[i] = np.sign(self.__u(x=x))
+		preds = self.predict(xs)
 		accuracy = np.sum(ys==preds) / xs.shape[0]
 		return accuracy

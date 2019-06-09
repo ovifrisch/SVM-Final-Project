@@ -2,6 +2,7 @@ from svm import SVM
 from kernels import Kernel
 import numpy as np
 import multiprocessing as mp
+import time
 
 class MP_SVM:
 	"""
@@ -28,11 +29,11 @@ class MP_SVM:
 		self.__solver = solver
 
 	def __fit_one(self, start, end, shared_classifiers):
-
 		clf = SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__solver)
 		xs = self.__xs[start:end, :]
 		ys = self.__ys[start:end]
 		clf.fit(xs, ys)
+		
 		shared_classifiers.put(clf)
 
 	def fit(self, x, y):
@@ -68,9 +69,6 @@ class MP_SVM:
 		pred_ys = np.zeros((end - start))
 		for clf in self.__classifiers:
 			pred_ys += clf.predict(self.test_xs[start:end, :])
-		# while (self.__classifiers.empty() == False):
-		# 	print("hey")
-		# 	pred_ys += self.__classifiers.get().predict(self.test_xs[start:end, :])
 
 		for i in range(end - start):
 			if (pred_ys[i] >= 0):
