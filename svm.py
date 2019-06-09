@@ -299,12 +299,9 @@ class SVM:
 	def predict(self, xs):
 
 		def sign(x):
-			return np.sign(self.__u(x=x))
+			return np.sign(self.__u(x = x))
 
-		start = time.time()
-		ret = np.apply_along_axis(sign, 1, xs)
-		print(time.time() - start)
-		return ret
+		return np.apply_along_axis(sign, 1, xs)
 
 
 	def predict_accuracy(self, xs, ys):

@@ -60,6 +60,38 @@ class SVC:
 		clf.fit(self.__xs, y)
 		shared_classifiers.put((clf, i))
 
+	def __unmap_labels(self, preds):
+		"""
+		Undo __map_labels
+		"""
+
+		for i in range(preds.shape[0]):
+			preds[i] = self.__class_map[preds[i]]
+		return preds
+
+	def __map_labels(self):
+		"""
+		If there are 2 classes, map one class to +1 and the other to -1
+		If there are >2 classes, map them to 0, 1, 2, 3, ...
+		Save the mappings so that you can convert back after testing
+		"""
+		self.__class_map = {}
+		labels = np.unique(self.__ys)
+		if (self.__num_classes == 2):
+			for i in range(self.__size):
+				if (self.__ys[i] == labels[0]):
+					self.__class_map[1] = labels[0]
+					self.__ys[i] = 1
+				else:
+					self.__class_map[-1] = labels[1]
+					self.__ys[i] = -1
+
+		else:
+			for i in range(self.__size):
+				new_label = np.where(labels == self.__ys[i])[0][0]
+				self.__class_map[new_label] = self.__ys[i]
+				self.__ys[i] = new_label
+
 	def fit(self, x, y):
 		"""
 		Parameters:
@@ -80,14 +112,17 @@ class SVC:
 
 		self.__size = x.shape[0]
 		self.__num_classes = np.unique(y).shape[0]
-		self.__xs = x
-		self.__ys = y
+		self.__xs = np.copy(x)
+		self.__ys = np.copy(y)
+		print(y)
+		self.__map_labels()
+		print(y)
 		self.__ovr_classifiers = [] # "One v. Rest" Classifiers
 
 		# Only 2 classes, so classify the usual way
 		if (self.__num_classes <= 2):
 			clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__solver)
-			clf.fit(self.__xs, y)
+			clf.fit(self.__xs, self.__ys)
 			self.__ovr_classifiers = [clf]
 			return
 
@@ -98,19 +133,29 @@ class SVC:
 		# set up interprocess communication
 		manager = mp.Manager()
 		shared_classifiers = manager.Queue()
-		processes = []
+		currently_executing_processes = []
 
 		# Create 1 process for each ovr classification task
+		# We are using the loop index as class labels (WARNING: Class labels may not be properly formatted (ie 0, 1, 2, ..))
 		for i in range(self.__num_classes):
-			processes.append(mp.Process(target=self.__train_one, args=(i,shared_classifiers)))
+			currently_executing_processes.append(mp.Process(target=self.__train_one, args=(i,shared_classifiers)))
+
+
+		# you need to start the max number of processes, move these processes from
 
 		# Start each process
-		for p in processes:
+		for p in currently_executing_processes:
 			p.start()
 
-		# Wait for them to finish
-		for p in processes:
-			p.join()
+
+		while (len(currently_executing_processes) > 0):
+			# wait for the oldest process, remove it from the currently_executing_processes
+			currently_executing_processes.pop(0).join()
+			if (i < self.__num_classes):
+				p = mp.Process(target=self.__train_one, args=(i, shared_classifiers))
+				i += 1 # increment i for next label
+				currently_executing_processes.append(p) # add to executing processes because of next line
+				p.start()
 
 		# Collect the classifiers from the queue
 		while (shared_classifiers.empty() == False):
@@ -138,7 +183,7 @@ class SVC:
 		# Main process will collect each of these and determine which class got the most votes for each of the samples
 
 		if (self.__num_classes == 2):
-			return self.__ovr_classifiers[0].predict(x)
+			return self.__unmap_labels(self.__ovr_classifiers[0].predict(x))
 
 		manager = mp.Manager()
 		shared_predictions = manager.Queue()
@@ -156,7 +201,7 @@ class SVC:
 		for p in processes:
 			p.join()
 
-		class_predictions = np.zeros((xs.shape[0], self.__num_classes))
+		class_predictions = np.zeros((x.shape[0], self.__num_classes))
 		while (shared_predictions.empty() == False):
 			tup = shared_predictions.get()
 			preds = tup[0]
@@ -167,13 +212,13 @@ class SVC:
 				else:
 					class_predictions[i, :] += 1
 					class_predictions[i, label] -= 1
-		return np.argmax(class_predictions, 1)
+		return self.__unmap_labels(np.argmax(class_predictions, 1))
 
 
 if __name__ == "__main__":
 
-	# BINARY
-	num_samples = 1000
+
+	num_samples = 100
 	pos = np.random.normal(loc=0, scale = 1, size=int(num_samples/2))
 	neg = np.random.normal(loc=5, scale = 1, size=int(num_samples/2))
 	xs = np.transpose(np.matrix(np.append(pos, neg)))
@@ -191,12 +236,14 @@ if __name__ == "__main__":
 
 
 	# MULTICLASS
-	# num_samples = 1000
+	# num_samples = 100
 	# one = np.random.normal(loc=0, scale = 1, size=int(num_samples/3))
 	# two = np.random.normal(loc=5, scale = 1, size=int(num_samples/3))
 	# three = np.random.normal(loc=10, scale = 1, size=int(num_samples/3))
 	# xs = np.transpose(np.matrix(np.append(np.append(one, two), three)))
 	# ys = np.append(np.append(np.zeros((int(num_samples/3))), np.ones((int(num_samples/3)))), np.ones(int(num_samples / 3)) + 1)
+	# print(xs)
+	# print(ys)
 	# xs, ys = shuffle(xs, ys)
 	# s = SVC()
 	# s.fit(xs, ys)

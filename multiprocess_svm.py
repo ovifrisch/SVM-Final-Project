@@ -65,7 +65,7 @@ class MP_SVM:
 			self.__classifiers.append(shared_classifiers.get())
 
 
-	def predict_one(self, start, end):
+	def predict_one(self, start, end, predictions):
 		pred_ys = np.zeros((end - start))
 		for clf in self.__classifiers:
 			pred_ys += clf.predict(self.test_xs[start:end, :])
@@ -76,7 +76,7 @@ class MP_SVM:
 			else:
 				pred_ys[i] = -1
 
-		self.__predictions.put((pred_ys, start, end))
+		predictions.put((pred_ys, start, end))
 
 
 	def predict(self, x):
@@ -84,12 +84,12 @@ class MP_SVM:
 		num_processes = 5
 		sub_samples = int(self.test_xs.shape[0] / num_processes)
 		mananger = mp.Manager()
-		self.__predictions = mananger.Queue()
+		predictions = mananger.Queue()
 		processes = []
 		for i in range(num_processes):
 			start_idx = i*sub_samples
 			end_idx = start_idx + sub_samples
-			processes.append(mp.Process(target = self.predict_one, args=(start_idx, end_idx)))
+			processes.append(mp.Process(target = self.predict_one, args=(start_idx, end_idx, predictions)))
 
 		for p in processes:
 			p.start()
@@ -98,8 +98,8 @@ class MP_SVM:
 			p.join()
 
 		preds = []
-		while (self.__predictions.empty() == False):
-			preds.append(self.__predictions.get())
+		while (predictions.empty() == False):
+			preds.append(predictions.get())
 
 		# sort by starting index
 		preds = sorted(preds, key=lambda pred: pred[1])
