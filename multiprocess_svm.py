@@ -17,19 +17,31 @@ class MP_SVM:
 	degree=3,
 	tolerance=0.1,
 	epsilon=0.1,
-	solver = "smo"
+	max_iter = 100,
+	solver = "smo",
+	num_processes = 5
 	):
-		self.__kernel_type = "rbf"
+		self.__kernel_type = kernel_type
 		self.__gamma = gamma
 		self.__degree = degree
 		self.__C = C
 		self.__tol = tolerance
 		self.__error_cache = {}
 		self.__eps = epsilon
+		self.__max_iter = max_iter
 		self.__solver = solver
+		self.__num_processes = num_processes
 
 	def __fit_one(self, start, end, shared_classifiers):
-		clf = SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__solver)
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
+		"""
+		clf = SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__max_iter, self.__solver)
 		xs = self.__xs[start:end, :]
 		ys = self.__ys[start:end]
 		clf.fit(xs, ys)
@@ -37,17 +49,24 @@ class MP_SVM:
 		shared_classifiers.put(clf)
 
 	def fit(self, x, y):
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
+		"""
 		self.__xs = x
 		self.__ys = y
 
 
-		num_processes = 5
-		sub_samples = int(self.__xs.shape[0] / num_processes)
+		sub_samples = int(self.__xs.shape[0] / self.__num_processes)
 		manager = mp.Manager()
 		shared_classifiers = manager.Queue()
 		processes = []
 
-		for i in range(num_processes):
+		for i in range(self.__num_processes):
 			start_idx = i*sub_samples
 			end_idx = start_idx + sub_samples
 			processes.append(mp.Process(target = self.__fit_one, args=(start_idx, end_idx, shared_classifiers)))
@@ -65,7 +84,16 @@ class MP_SVM:
 			self.__classifiers.append(shared_classifiers.get())
 
 
+
 	def predict_one(self, start, end, predictions):
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
+		"""
 		pred_ys = np.zeros((end - start))
 		for clf in self.__classifiers:
 			pred_ys += clf.predict(self.test_xs[start:end, :])
@@ -80,13 +108,20 @@ class MP_SVM:
 
 
 	def predict(self, x):
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
+		"""
 		self.test_xs = x
-		num_processes = 5
-		sub_samples = int(self.test_xs.shape[0] / num_processes)
+		sub_samples = int(self.test_xs.shape[0] / self.__num_processes)
 		mananger = mp.Manager()
 		predictions = mananger.Queue()
 		processes = []
-		for i in range(num_processes):
+		for i in range(self.__num_processes):
 			start_idx = i*sub_samples
 			end_idx = start_idx + sub_samples
 			processes.append(mp.Process(target = self.predict_one, args=(start_idx, end_idx, predictions)))
@@ -106,5 +141,13 @@ class MP_SVM:
 		return np.concatenate([pred[0] for pred in preds])
 
 	def predict_accuracy(self, x, y):
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
+		"""
 		preds = self.predict(x)
 		return np.sum(preds == y) / x.shape[0]

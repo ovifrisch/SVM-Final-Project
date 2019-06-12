@@ -12,19 +12,24 @@ class SVC:
 	self,
 	kernel_type='rbf',
 	C=1,
-	gamma=1,
+	gamma=3,
 	degree=3,
 	tolerance=0.01,
 	epsilon=0.01,
-	solver = "smo"):
-		self.__kernel_type = "rbf"
+	max_iter = 100,
+	solver = "smo",
+	num_processes = 5
+	):
+		self.__kernel_type = kernel_type
 		self.__gamma = gamma
 		self.__degree = degree
 		self.__C = C
 		self.__tol = tolerance
 		self.__error_cache = {}
 		self.__eps = epsilon
+		self.__max_iter = max_iter
 		self.__solver = solver
+		self.__num_processes = num_processes
 
 	def get_y_matrix(self):
 		"""
@@ -44,25 +49,20 @@ class SVC:
 			y_mat[:, i] = this_y
 		return y_mat
 
-	def __train_one(self, i, shared_classifiers):
-		"""
-		Parameters:
-		-----------
-		i : int
-			- Index for the y_mat matrix
-
-		This function trains the ith classifier and
-		appends the instance of the classifier to
-		the multiprocessing queue
-		"""
-		y = self.__y_mat[:, i]
-		clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__solver)
-		clf.fit(self.__xs, y)
-		shared_classifiers.put((clf, i))
+	
 
 	def __unmap_labels(self, preds):
 		"""
 		Undo __map_labels
+		"""
+
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
 		"""
 
 		for i in range(preds.shape[0]):
@@ -74,6 +74,15 @@ class SVC:
 		If there are 2 classes, map one class to +1 and the other to -1
 		If there are >2 classes, map them to 0, 1, 2, 3, ...
 		Save the mappings so that you can convert back after testing
+		"""
+
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
 		"""
 		self.__class_map = {}
 		labels = np.unique(self.__ys)
@@ -91,6 +100,22 @@ class SVC:
 				new_label = np.where(labels == self.__ys[i])[0][0]
 				self.__class_map[new_label] = self.__ys[i]
 				self.__ys[i] = new_label
+
+	def __train_one(self, i, shared_classifiers):
+		"""
+		Parameters:
+		-----------
+		i : int
+			- Index for the y_mat matrix
+
+		This function trains the ith classifier and
+		appends the instance of the classifier to
+		the multiprocessing queue
+		"""
+		y = self.__y_mat[:, i]
+		clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__max_iter, self.__solver, self.__num_processes)
+		clf.fit(self.__xs, y)
+		shared_classifiers.put((clf, i))
 
 	def fit(self, x, y):
 		"""
@@ -114,14 +139,12 @@ class SVC:
 		self.__num_classes = np.unique(y).shape[0]
 		self.__xs = np.copy(x)
 		self.__ys = np.copy(y)
-		print(y)
 		self.__map_labels()
-		print(y)
 		self.__ovr_classifiers = [] # "One v. Rest" Classifiers
 
 		# Only 2 classes, so classify the usual way
 		if (self.__num_classes <= 2):
-			clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__solver)
+			clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__max_iter, self.__solver, self.__num_processes)
 			clf.fit(self.__xs, self.__ys)
 			self.__ovr_classifiers = [clf]
 			return
@@ -137,7 +160,7 @@ class SVC:
 
 		# Create 1 process for each ovr classification task
 		# We are using the loop index as class labels (WARNING: Class labels may not be properly formatted (ie 0, 1, 2, ..))
-		for i in range(self.__num_classes):
+		for i in range(min(4, self.__num_classes)):
 			currently_executing_processes.append(mp.Process(target=self.__train_one, args=(i,shared_classifiers)))
 
 
@@ -151,9 +174,9 @@ class SVC:
 		while (len(currently_executing_processes) > 0):
 			# wait for the oldest process, remove it from the currently_executing_processes
 			currently_executing_processes.pop(0).join()
-			if (i < self.__num_classes):
-				p = mp.Process(target=self.__train_one, args=(i, shared_classifiers))
+			if (i + 1 < self.__num_classes):
 				i += 1 # increment i for next label
+				p = mp.Process(target=self.__train_one, args=(i, shared_classifiers))
 				currently_executing_processes.append(p) # add to executing processes because of next line
 				p.start()
 
@@ -165,6 +188,7 @@ class SVC:
 		shared_predictions.put((clf.predict(x), label))
 
 
+	# REMEMBER TO CREATE QUEUE OF PROCESSES!! DONT SPAWNW MORE THAN COMP CAN HANDLE
 	def predict(self, x):
 		"""
 		Parameters:
@@ -214,40 +238,3 @@ class SVC:
 					class_predictions[i, label] -= 1
 		return self.__unmap_labels(np.argmax(class_predictions, 1))
 
-
-if __name__ == "__main__":
-
-
-	num_samples = 100
-	pos = np.random.normal(loc=0, scale = 1, size=int(num_samples/2))
-	neg = np.random.normal(loc=5, scale = 1, size=int(num_samples/2))
-	xs = np.transpose(np.matrix(np.append(pos, neg)))
-	ys = np.append(np.ones(int(num_samples/2)), -1*np.ones(int(num_samples/2)))
-	xs, ys = shuffle(xs, ys)
-	s = SVC()
-	start = time.time()
-	s.fit(xs, ys)
-	print("train time: " + str(time.time() - start))
-	start = time.time()
-	preds = s.predict(xs)
-	print("test time: " + str(time.time() - start))
-	acc = np.sum(preds == ys) / num_samples
-	print(acc)
-
-
-	# MULTICLASS
-	# num_samples = 100
-	# one = np.random.normal(loc=0, scale = 1, size=int(num_samples/3))
-	# two = np.random.normal(loc=5, scale = 1, size=int(num_samples/3))
-	# three = np.random.normal(loc=10, scale = 1, size=int(num_samples/3))
-	# xs = np.transpose(np.matrix(np.append(np.append(one, two), three)))
-	# ys = np.append(np.append(np.zeros((int(num_samples/3))), np.ones((int(num_samples/3)))), np.ones(int(num_samples / 3)) + 1)
-	# print(xs)
-	# print(ys)
-	# xs, ys = shuffle(xs, ys)
-	# s = SVC()
-	# s.fit(xs, ys)
-	# print("done training")
-	# preds = s.predict(xs)
-	# acc = np.sum(preds == ys) / num_samples
-	# print(acc)

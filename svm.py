@@ -22,6 +22,8 @@ class SVM:
 		- tolerance for stopping criteria
 	epsilon : float, optional (defualt = 1e-4)
 		- UPDATE AFTER UNDERSTANDING
+	max_iter : int
+		- The maximum number of iterations of SMO.
 	solver : string, optional (default = "smo")
 		- Which optimization algorithm to use for the dual form of the Obj
 	"""
@@ -34,6 +36,7 @@ class SVM:
 	degree=3,
 	tolerance=0.1,
 	epsilon=0.1,
+	max_iter = 100,
 	solver = "smo"
 	):
 		self.__kernel = Kernel(kernel_type, gamma, degree)
@@ -41,25 +44,59 @@ class SVM:
 		self.__tol = tolerance
 		self.__error_cache = {}
 		self.__eps = epsilon
+		self.__max_iter = max_iter
 		self.__solver = solver
 
 	def __del__(self):
 		pass
 
+	def valid_train_params(self, x, y):
+		"""
+		Parameters
+		----------
+		x : ndarray
+			- Data
+		y : ndarray
+			- Labels
+
+		Returns
+		-------
+		bool
+			- True if training params are valid, False otherwise
+		"""
+
+		# Check at least 1 row
+		if (x.shape == () or y.shape == ()):
+			print("Empty array(s)!")
+			return False
+
+		# Check that they have same number of rows
+		if (x.shape[0] != y.shape[0]):
+			print("Input sizes do not match")
+			return False
+
+		return True
+
+
 	def fit(self, x, y):
 		"""
 		Parameters
 		----------
-		x : ndarray - Data
-		y : ndarray - Labels
+		x : ndarray
+			- Data
+		y : ndarray
+			- Labels
 
-		Returns
+		Actions
 		-------
-		self : object
+		Creates the SVM model over x and y
+			- Calls SMO to solve for alphas and b
+			- Sets the support vectors
+
 		"""
 		# Make sure data is clean
-		# if (not self.valid_train_params(X, Y)):
-		# 	print("Invalid")
+		if (not self.valid_train_params(x, y)):
+			exit(1)
 
 		self.__xs = x
 		self.__ys = y
@@ -75,50 +112,152 @@ class SVM:
 
 	def __get_kernel_matrix(self):
 		"""
-		Precompute the Kernel Matrix
+
+		Actions:
+		-------
+		Compute and store the kernel matrix KM over the input data
+
 		"""
 		self.__KM = np.zeros((self.__size, self.__size))
 		for i in range(self.__size):
 			for j in range(self.__size):
-				self.__KM[i][j] = self.__kernel.eval(self.__xs[i], self.__xs[j])
+				self.__KM[i, j] = self.__kernel.eval(self.__xs[i], self.__xs[j])
 
 	def __initialize_error_cache(self):
+		"""
+
+		Actions
+		-------
+		Initialize the error over each training example
+		Since the model output is initially 0 for all xi,
+		the Error is 0 - yi = -yi
+		"""
 		for i in range(self.__size):
 			self.__error_cache[i] = -self.__ys[i]
 
 
 	def __solve(self, solver):
+		"""
+		Parameters
+		----------
+		solver : string
+			- The quadratic optimization algorithm to use
+
+		Actions:
+		--------
+		Calls the appropriate optimizer function
+		"""
 		if (solver == "smo"):
 			return self.__smo()
 
+	def __get_bounds(self, s, i1, i2):
+		"""
+		Parameters
+		----------
+		s : int
+			- 1 if x[i1] and x[i2] have same label, -1 otherwise
+		i1 : int
+			- Index of second chosen Lagrange multiplier
+		i2 : int
+			- Index of first chosen Lagrange multiplier
 
-	def __takeStep(self, i1, i2, E2):
+		Returns:
+		--------
+		The minimum and maximum values that the new alpha2 can take
+		"""
+		
+
+		return L, H
+
+	def __optimize_and_clip(self, a2_old, y2, E1, E2, eta, L, H):
+		"""
+		Parameters
+		----------
+		a2_old : float
+			- current values of alphas[i2]
+		y2 : int
+			- label of x[i2]
+		E1 : float
+			- Error on x[i1]
+		E2 : float
+			- Error on x[i2]
+		eta : floats
+			- Second derivative of dual objective
+		L : float
+			- Lower bound for new alpha2
+		H : float
+			- Upper bound for new alpha2
+
+		Returns:
+		--------
+		a2 : float
+			- The new optimal, clipped lagrangian multiplier
+		"""
+		a2 = a2_old + ((y2*(E1 - E2))/eta)
+		if (a2 < L):
+			a2 = L
+		elif (a2 > H):
+			a2 = H
+		return a2
+
+
+	def __take_step(self, i1, i2, E2):
+		"""
+		Parameters
+		----------
+		i1 : int
+			- Index of second chosen Lagrange multiplier
+		i2 : int
+			- Index of second first Lagrange multiplier
+		E2 : float
+			- Error on the first chosen Lagrange multiplier
+
+		Actions
+		-------
+		Update alphas by optimizing 2
+		Find optimal value for 1 alpha, clip so constraints are not violated, then solve for 
+
+		Returns
+		-------
+		"""
+
+		# Same alphas or invalid alpha
 		if (i1 == i2 or i1 == -1):
 			return 0
+
+		# old alphas
 		alph1 = self.__alphas[i1]
 		alph2 = self.__alphas[i2]
+
+		# ys
 		y1 = self.__ys[i1]
 		y2 = self.__ys[i2]
+
+		# Error on alph1
 		E1 = self.__error_cache[i1]
 		s = y1*y2
 
-		# y1 == y2
+		# Compute Lower and Upper bounds
 		if (s > 0):
 			L = max(0, self.__alphas[i2] - self.__alphas[i1] - self.__C)
 			H = min(self.__C, self.__alphas[i2] + self.__alphas[i1])
 
-		# y1 != y2
 		else:
 			L = max(0, self.__alphas[i2] - self.__alphas[i1])
 			H = min(self.__C, self.__C + self.__alphas[i2] - self.__alphas[i1])
+
+		# No feasible alphas here
 		if (L == H):
 			return 0
-		k11 = self.__kernel.eval(self.__xs[i1, :], self.__xs[i1, :])
-		k12 = self.__kernel.eval(self.__xs[i1, :], self.__xs[i2, :])
-		k22 = self.__kernel.eval(self.__xs[i2, :], self.__xs[i2, :])
+
+		# eta = k11 + k22 - k12
+		k11 = self.__KM[i1, i1]
+		k22 = self.__KM[i2, i2]
+		k12 = self.__KM[i1, i2]
 		eta = k11 + k22 - (2*k12)
+
+		# Optimum is valid. Set new a2 to optimal value and then clip
 		if (eta > 0):
-			# optimum value for a2
 			a2 = alph2 + ((y2*(E1 - E2))/eta)
 			if (a2 < L):
 				a2 = L
@@ -142,9 +281,15 @@ class SVM:
 			else:
 				a2 = alph2
 
+
+		# Not a significant change in a2 so dont change it and return 0
 		if (abs(a2 - alph2) < self.__eps * (a2 + alph2 + self.__eps)):
 			return 0
+
+		# Compute a1 from box linear constraint
 		a1 = alph1 + s*(alph2 - a2)
+
+		# Make sure a1 is in feasible region
 		if (a1 < 0):
 			a2 += s * a1
 			a1 = 0
@@ -163,9 +308,10 @@ class SVM:
 		t1 = y1 * (a1 - alph1)
 		t2 = y2 * (a2 - alph2)
 
+
 		for i in range(self.__size):
 			if (self.__alphas[i] > 0 and self.__alphas[i] < self.__C):
-				self.__error_cache[i] += t1 * self.__kernel.eval(self.__xs[i1, :], self.__xs[i, :]) + t2 * self.__kernel.eval(self.__xs[i2, :], self.__xs[i, :]) - delta_b
+				self.__error_cache[i] += t1 * self.__KM[i1, i] + t2 * self.__KM[i2, i] - delta_b
 
 		self.__error_cache[i1] = 0
 		self.__error_cache[i2] = 0
@@ -176,6 +322,17 @@ class SVM:
 		return 1
 
 	def __second_choice_heuristic(self, E2):
+		"""
+		Parameters
+		----------
+		E2 : int
+			- Error on first selected alpha value
+
+		Returns
+		-------
+		i1 : int
+			- The index of the training example that maximizes the absolute value of errors E1 and E2
+		"""
 		tmax = 0
 		i1 = -1
 		for k in range(self.__size):
@@ -194,6 +351,12 @@ class SVM:
 		i2 : int
 			- Index of current training example
 
+		Actions:
+		-------
+		Checks if alphas[i2] violates the KKT conditions
+		If it does, use the heuristics to select the second alpha value
+		Then optimize them jointly by calling takeStep
+
 
 		Returns
 		------
@@ -207,16 +370,16 @@ class SVM:
 		r2 = E2*y2
 		if ((r2 < -self.__tol and alph2 < self.__C) or (r2 > self.__tol and alph2 > 0)):
 			i1 = self.__second_choice_heuristic(E2)
-			if (self.__takeStep(i1, i2, E2)):
+			if (self.__take_step(i1, i2, E2)):
 				return 1
 			idx = random.randint(0, self.__size)
 			for i1 in list(range(idx, self.__size)) + list(range(0, idx)):
 				if (self.__alphas[i1] > 0 and self.__alphas[i1] < self.__C):
-					if (self.__takeStep(i1, i2, E2)):
+					if (self.__take_step(i1, i2, E2)):
 						return 1
 
 			for i1 in list(range(idx, self.__size)) + list(range(0, idx)):
-				if (self.__takeStep(i1, i2, E2)):
+				if (self.__take_step(i1, i2, E2)):
 					return 1
 		
 
@@ -246,8 +409,11 @@ class SVM:
 
 		# Store errors to speed up algorithm
 		self.__initialize_error_cache()
+		steps = 0
 		while (num_changed > 0 or examine_all):
-			num_changed = 0
+			steps += 1
+			if (steps > self.__max_iter):
+				break
 			if (examine_all):
 				# loop over entire training set
 				for i in range(self.__size):
@@ -291,13 +457,25 @@ class SVM:
 			kernel_vector = self.__KM[idx, :]
 			return np.sum(kernel_vector * self.__ys *self.__alphas) - self.__b
 		else:
+			if (self.__supp_x.shape[0] == 0):
+				return -self.__b
 			kernel_vector = np.apply_along_axis(self.__kernel.eval, 1, self.__supp_x, x2=x)
 			mult = kernel_vector * self.__supp_y, * self.__supp_a
 			return np.sum(mult[0]) - self.__b
 
 
 	def predict(self, xs):
+		"""
+		Parameters
+		----------
+		xs : ndarray
+			- Input samples to predict the labels of
 
+		Returns
+		-------
+		ndarray
+			- Predicted labels of xs
+		"""
 		def sign(x):
 			return np.sign(self.__u(x = x))
 
@@ -305,6 +483,19 @@ class SVM:
 
 
 	def predict_accuracy(self, xs, ys):
+		"""
+		Parameters
+		----------
+		xs : ndarray
+			- Input samples to predict the labels of
+		ys : ndarray
+			- Labels of xs
+
+		Returns
+		-------
+		accuracy : float
+			- The accuracy of the prediction
+		"""
 		preds = self.predict(xs)
 		accuracy = np.sum(ys==preds) / xs.shape[0]
 		return accuracy

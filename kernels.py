@@ -29,20 +29,52 @@ class Kernel:
 			return self.__rbf(x1, x2)
 		elif (self.__kernel_type == "linear"):
 			return self.__linear(x1, x2)
-		elif (self.__kernel_type == "sgm"):
+		elif (self.__kernel_type == "sigmoid"):
 			return self.__sigmoid(x1, x2)
 		elif (self.__kernel_type == "poly"):
 			return self.__poly(x1, x2)
 
 	def __linear(self, x1, x2):
-		return np.dot(x1, x2)[0,0]
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
+		"""
+		return np.dot(x1, x2)
 
 	def __rbf(self, x1, x2):
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
+		"""
 		return math.exp((self.__gamma * -1) * pow(np.linalg.norm(x1 - x2), 2))
 
 	# this might be wrong
 	def __sigmoid(self, x1, x2):
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
+		"""
 		return np.tanh(self.__gamma * np.dot(x1, x2)[0,0])
 
 	def __poly(self, x1, x2):
+		"""
+		Parameters
+		----------
+
+
+		Returns
+		-------
+		"""
 		return pow(np.dot(x1, x2)[0,0] + 1, self.__degree)

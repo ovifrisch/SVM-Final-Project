@@ -26,19 +26,38 @@ def gen_labels(M, C):
 
 
 def accuracy(y, yhat):
-	return sum(y==yhat)
+	return round(sum(y==yhat) / y.shape[0], 3)
 
-labels = 2
-dimensions = 1
-samples = 100
+dimensions = [1, 5, 10, 20, 50, 100, 300, 1000]
+samples = [100, 200, 500, 1000, 2000, 5000]
+min_dims = [1, 5, 10, 20, 50]
+min_samples = [100, 200, 500]
+labels =10
 
-x = gen_ndim_norm(N = dimensions, M = samples, C = labels)
-y = gen_labels(samples, labels)
-print(x)
-print(y)
+x = gen_ndim_norm(N = 1, M = 1000, C = labels)
+y = gen_labels(1000, labels)
 x, y = shuffle(x, y)
-clf = SVC()
+clf = SVC(max_iter=1000)
+start = time.time()
 clf.fit(x, y)
+train_time = round(time.time() - start, 3)
+start = time.time()
 yhat = clf.predict(x)
-acc = accuracy(yhat, y)
-print("Samples: " + str(100) + "  Dims: " + str(1) + "  Accuracy: " + str(acc))
+test_time = round(time.time() - start, 3)
+acc = accuracy(y, yhat)
+print("  Accuracy: " + str(acc) + "  Train Time: " + str(train_time))
+
+# for d in min_dims:
+#     for s in min_samples:
+#         x = gen_ndim_norm(N = d, M = s, C = labels)
+#         y = gen_labels(s, labels)
+#         x, y = shuffle(x, y)
+#         clf = SVC()
+#         start = time.time()
+#         clf.fit(x, y)
+#         train_time = round(time.time() - start, 3)
+#         start = time.time()
+#         yhat = clf.predict(x)
+#         test_time = round(time.time() - start, 3)
+#         acc = accuracy(y, yhat)
+#         print("Samples: " + str(s) + "  Dims: " + str(d) + "  Accuracy: " + str(acc) + "  Train Time: " + str(train_time))
