@@ -137,28 +137,42 @@ def gen_labels(M, C):
 
 # RESULTS 4
 
-seps = list(range(0, 400, 5))
-seps = [x / 100 for x in seps]
-print(seps)
-results = np.zeros(len(seps))
-num_samples = 400
-dim = 3
-for i, sep in enumerate(seps):
-	x_train, x_test = gen_ndim_norm(dim, num_samples, 2, sep), gen_ndim_norm(dim, num_samples, 2, sep)
-	y_train, y_test = gen_labels(num_samples, 2), gen_labels(num_samples, 2)
-	svc1 = SVC(max_iter=1000)
-	svc1.fit(x_train, y_train)
-	p1 = svc1.predict(x_test)
-	acc1 = sum(p1 == y_test) / num_samples
-	results[i] = acc1
-	print("done " + str(sep))
+# seps = list(range(0, 400, 5))
+# seps = [x / 100 for x in seps]
+# print(seps)
+# results = np.zeros(len(seps))
+# num_samples = 400
+# dim = 3
+# for i, sep in enumerate(seps):
+# 	x_train, x_test = gen_ndim_norm(dim, num_samples, 2, sep), gen_ndim_norm(dim, num_samples, 2, sep)
+# 	y_train, y_test = gen_labels(num_samples, 2), gen_labels(num_samples, 2)
+# 	svc1 = SVC(max_iter=1000)
+# 	svc1.fit(x_train, y_train)
+# 	p1 = svc1.predict(x_test)
+# 	acc1 = sum(p1 == y_test) / num_samples
+# 	results[i] = acc1
+# 	print("done " + str(sep))
 
-plt.plot(np.asarray(seps), results, 'ro', label = "SVC2")
-plt.title("Data Separation vs Accuracy")
-plt.xlabel("Units of separation")
-plt.ylabel("Accuracy")
-plt.legend()
-plt.show()
+# plt.plot(np.asarray(seps), results, 'ro', label = "SVC2")
+# plt.title("Data Separation vs Accuracy")
+# plt.xlabel("Units of separation")
+# plt.ylabel("Accuracy")
+# plt.legend()
+# plt.show()
+
+num_labels = 6
+num_samples = 200
+num_dims = 2
+sep = 10
+
+x_train, x_test = gen_ndim_norm(num_dims, num_samples, num_labels, sep), gen_ndim_norm(num_dims, num_samples, num_labels, sep)
+y_train, y_test = gen_labels(num_samples, num_labels), gen_labels(num_samples, num_labels)
+x_train, y_train = shuffle(x_train, y_train)
+
+svc2 = SVC()
+svc2.fit(x_train, y_train)
+acc = svc2.predict_accuracy(x_test, y_test)
+print(acc)
 
 
 

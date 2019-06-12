@@ -50,33 +50,6 @@ class SVM:
 	def __del__(self):
 		pass
 
-	def valid_train_params(self, x, y):
-		"""
-		Parameters
-		----------
-		x : ndarray
-			- Data
-		y : ndarray
-			- Labels
-
-		Returns
-		-------
-		bool
-			- True if training params are valid, False otherwise
-		"""
-
-		# Check at least 1 row
-		if (x.shape == () or y.shape == ()):
-			print("Empty array(s)!")
-			return False
-
-		# Check that they have same number of rows
-		if (x.shape[0] != y.shape[0]):
-			print("Input sizes do not match")
-			return False
-
-		return True
-
 
 	def fit(self, x, y):
 		"""
@@ -94,9 +67,6 @@ class SVM:
 			- Sets the support vectors
 
 		"""
-		# Make sure data is clean
-		if (not self.valid_train_params(x, y)):
-			exit(1)
 
 		self.__xs = x
 		self.__ys = y
@@ -480,22 +450,3 @@ class SVM:
 			return np.sign(self.__u(x = x))
 
 		return np.apply_along_axis(sign, 1, xs)
-
-
-	def predict_accuracy(self, xs, ys):
-		"""
-		Parameters
-		----------
-		xs : ndarray
-			- Input samples to predict the labels of
-		ys : ndarray
-			- Labels of xs
-
-		Returns
-		-------
-		accuracy : float
-			- The accuracy of the prediction
-		"""
-		preds = self.predict(xs)
-		accuracy = np.sum(ys==preds) / xs.shape[0]
-		return accuracy
