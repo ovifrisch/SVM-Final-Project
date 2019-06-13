@@ -1,4 +1,5 @@
 from sklearn.datasets.samples_generator import make_circles
+from sklearn.datasets.samples_generator import make_moons
 import matplotlib.pyplot as plt
 from svc2 import SVC
 import time
@@ -6,24 +7,25 @@ import sklearn.svm as skl
 import numpy as np
 from sklearn.utils import shuffle
 
-def gen_ndim_norm(N, M, C, space):
-    # map class label to its normal distb ctr.
-    def loc_func(i):
-        return i * space
+def generate_xs(num_rows, num_cols, num_classes, class_separation):
     
-    partition = int(M / C) # each class will have this many samples
-    mat = np.zeros((partition*C, N))
-    for i in range(C):
+    # Function that sets the center of a class as a function of its label
+    def loc_func(i):
+        return i * class_separation
+    
+    partition = int(num_rows / num_classes) # each class will have this many samples
+    mat = np.zeros((partition*num_classes, num_cols))
+    for i in range(num_classes):
         for j in range(partition):
-            mat[(i*partition) + j, :] = np.random.normal(loc=loc_func(i), scale = 1, size=N)
+            mat[(i*partition) + j, :] = np.random.normal(loc=loc_func(i), scale = 1, size=num_cols)
     return mat
 
 
-def gen_labels(M, C):
+def generate_ys(num_rows, num_classes):
     # create a 1 dimensional ndarray like: [0,0,0,1,1,1] if M was 6 and c was 2
-    partition = int(M / C)
-    y = np.zeros(partition * C)
-    for i in range(C):
+    partition = int(num_rows / num_classes)
+    y = np.zeros(partition * num_classes)
+    for i in range(num_classes):
         y[i*partition:i*partition+partition] = np.repeat(i, partition)
     return y
 
@@ -69,8 +71,8 @@ def gen_labels(M, C):
 # 	plt.show()
 
 
-#plot_2d(3, "Training Time vs Num Samples", "Time (in seconds)")
-#plot_2d(2, "Accuracy vs Num Samples", "Accuracy")
+# plot_2d(3, "Training Time vs Num Samples", "Time (in seconds)")
+# plot_2d(2, "Accuracy vs Num Samples", "Accuracy")
 
 
 # RESULTS 2
@@ -107,15 +109,16 @@ def gen_labels(M, C):
 
 # RESULTS 3
 
-# dimensions = list(range(0, 155, 5))[1:]
+# dimensions = list(range(0, 400, 5))[1:]
 # num_samples = 100
 # results = np.zeros((len(dimensions), 2))
 
 # for idx, dim in enumerate(dimensions):
 # 	x_train, x_test = gen_ndim_norm(dim, num_samples, 2, 2), gen_ndim_norm(dim, num_samples, 2, 2)
 # 	y_train, y_test = gen_labels(num_samples, 2), gen_labels(num_samples, 2)
+# 	x_train, y_train = shuffle(x_train, y_train)
 # 	svc1 = SVC(max_iter=1000)
-# 	svc2 = skl.SVC(max_iter=1000)
+# 	svc2 = skl.SVC(max_iter=1000, gamma='auto')
 # 	svc1.fit(x_train, y_train)
 # 	svc2.fit(x_train, y_train)
 # 	p1 = svc1.predict(x_test)
@@ -139,13 +142,13 @@ def gen_labels(M, C):
 
 # seps = list(range(0, 400, 5))
 # seps = [x / 100 for x in seps]
-# print(seps)
 # results = np.zeros(len(seps))
 # num_samples = 400
 # dim = 3
 # for i, sep in enumerate(seps):
 # 	x_train, x_test = gen_ndim_norm(dim, num_samples, 2, sep), gen_ndim_norm(dim, num_samples, 2, sep)
 # 	y_train, y_test = gen_labels(num_samples, 2), gen_labels(num_samples, 2)
+# 	x_train, y_train = shuffle(x_train, y_train)
 # 	svc1 = SVC(max_iter=1000)
 # 	svc1.fit(x_train, y_train)
 # 	p1 = svc1.predict(x_test)
@@ -160,19 +163,68 @@ def gen_labels(M, C):
 # plt.legend()
 # plt.show()
 
-num_labels = 6
-num_samples = 200
-num_dims = 2
-sep = 10
 
-x_train, x_test = gen_ndim_norm(num_dims, num_samples, num_labels, sep), gen_ndim_norm(num_dims, num_samples, num_labels, sep)
-y_train, y_test = gen_labels(num_samples, num_labels), gen_labels(num_samples, num_labels)
-x_train, y_train = shuffle(x_train, y_train)
+# RESULTS 5
+num_classes_list = list(range(2, 11))
 
-svc2 = SVC()
-svc2.fit(x_train, y_train)
-acc = svc2.predict_accuracy(x_test, y_test)
-print(acc)
+# Keep the # of samples, # of dimensions fixed, and separation fixed
+num_samples = 500
+num_dims = 3
+sep = 4
+
+# Put the models we want to test in a list
+models = [(SVC(num_processes1=4), "SVC2"), (skl.SVC(gamma="auto"), "SVC"), (SVC(num_processes1=1), "SVC2'"), (SVC(num_processes1=4, num_processes2 = 1), "SVC2''")]
+
+accuracies = np.zeros((len(models), len(num_classes_list)))
+times = np.zeros((len(models), len(num_classes_list)))
+
+for i, num_classes in enumerate(num_classes_list):
+    # generate data
+    tr_x, te_x = generate_xs(num_samples, num_dims, num_classes, sep), generate_xs(num_samples, num_dims, num_classes, sep)
+    tr_y, te_y = generate_ys(num_samples, num_classes), generate_ys(num_samples, num_classes)
+    tr_x, tr_y = shuffle(tr_x, tr_y)
+    for j, model in enumerate(models):
+        t = time.time()
+        model[0].fit(tr_x, tr_y)
+        t = time.time() - t
+        preds = model[0].predict(te_x)
+        acc = sum(preds == te_y) / num_samples
+        accuracies[j, i] = acc
+        times[j, i] = round(t, 3)
+    print("done " + str(num_classes))
+
+def plot_(data_arr, title, ylabel):
+    colors = ["bo-", "ro-", "go-", "yo-"]
+    for i, model in enumerate(models):
+        if (ylabel == "Accuracy" and i > 1):
+            break
+        plt.plot(np.asarray(num_classes_list), data_arr[i, :], colors[i], label=model[1])
+    plt.title(title)
+    plt.ylabel(ylabel)
+    plt.xlabel('# Classes')
+    plt.legend()
+    if (ylabel == "Accuracy"):
+        plt.ylim((0.9,1.001))
+    plt.show()
+
+
+plot_(times, "# Classes vs. Time", "Time (in seconds)")
+plot_(accuracies, "# Classes vs Accuracy", "Accuracy")
+
+
+# num_labels = 2
+# num_samples = 200
+# num_dims = 5
+# sep = 2
+
+# x_train, x_test = gen_ndim_norm(num_dims, num_samples, num_labels, sep), gen_ndim_norm(num_dims, num_samples, num_labels, sep)
+# y_train, y_test = gen_labels(num_samples, num_labels), gen_labels(num_samples, num_labels)
+# x_train, y_train = shuffle(x_train, y_train)
+
+# svc2 = SVC()
+# svc2.fit(x_train, y_train)
+# acc = svc2.predict_accuracy(x_test, y_test)
+# print(acc)
 
 
 

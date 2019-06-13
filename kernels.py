@@ -65,7 +65,7 @@ class Kernel:
 		Returns
 		-------
 		"""
-		return np.tanh(self.__gamma * np.dot(x1, x2)[0,0])
+		return np.tanh(self.__gamma * np.dot(x1, x2))
 
 	def __poly(self, x1, x2):
 		"""
@@ -76,4 +76,4 @@ class Kernel:
 		Returns
 		-------
 		"""
-		return pow(np.dot(x1, x2)[0,0] + 1, self.__degree)
+		return pow(np.dot(x1, x2) + 1, self.__degree)

@@ -19,7 +19,7 @@ class SVC:
 
 	Parameters
 	----------
-	kernel_type : string, optional (default = "rbf")
+	kernel : string, optional (default = "rbf")
 		- Kernel to be used to transform data
 	C : float, optional (default = 1)
 		- Coefficient of error term in Soft Margin Obj Function
@@ -35,12 +35,14 @@ class SVC:
 		- The maximum number of iterations of SMO.
 	solver : string, optional (default = "smo")
 		- Which optimization algorithm to use for the dual form of the Obj
-	num_processes : int
-		- The maximum number of processes to use
+	num_processes1 : int
+		- The number of processes to use for SVC
+	num_processes2 : int
+		- The number of processes to use for MPSVM
 	"""
 	def __init__(
 	self,
-	kernel_type='rbf',
+	kernel='rbf',
 	C=1,
 	gamma=3,
 	degree=3,
@@ -48,9 +50,10 @@ class SVC:
 	epsilon=0.01,
 	max_iter = 100,
 	solver = "smo",
-	num_processes = 5
+	num_processes1 = 5,
+	num_processes2 = 5
 	):
-		self.__kernel_type = kernel_type
+		self.__kernel_type = kernel
 		self.__gamma = gamma
 		self.__degree = degree
 		self.__C = C
@@ -59,7 +62,9 @@ class SVC:
 		self.__eps = epsilon
 		self.__max_iter = max_iter
 		self.__solver = solver
-		self.__num_processes = num_processes
+		self.__num_processes1 = num_processes1
+		self.__num_processes2 = num_processes2
+		self.__max_processes = 4
 
 	def get_y_matrix(self):
 		"""
@@ -159,7 +164,7 @@ class SVC:
 		the multiprocessing queue
 		"""
 		y = self.__y_mat[:, i]
-		clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__max_iter, self.__solver, self.__num_processes)
+		clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__max_iter, self.__solver, self.__num_processes2)
 		clf.fit(self.__xs, y)
 		shared_classifiers.put((clf, i))
 
@@ -220,7 +225,7 @@ class SVC:
 
 		# Only 2 classes, so classify the usual way
 		if (self.__num_classes <= 2):
-			clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__max_iter, self.__solver, self.__num_processes)
+			clf = MP_SVM(self.__kernel_type, self.__C, self.__gamma, self.__degree, self.__tol, self.__eps, self.__max_iter, self.__solver, self.__num_processes2)
 			clf.fit(self.__xs, self.__ys)
 			self.__ovr_classifiers = [clf]
 			return
@@ -236,7 +241,7 @@ class SVC:
 
 		# Create 1 process for each ovr classification task
 		# We are using the loop index as class labels (WARNING: Class labels may not be properly formatted (ie 0, 1, 2, ..))
-		for i in range(min(4, self.__num_classes)):
+		for i in range(min(min(self.__max_processes, self.__num_classes), self.__num_processes1)):
 			currently_executing_processes.append(mp.Process(target=self.__train_one, args=(i,shared_classifiers)))
 
 
@@ -305,7 +310,7 @@ class SVC:
 
 		# Create one process for each predition task
 		currently_executing_processes = []
-		for i in range(min(4, self.__num_classes)):
+		for i in range(min(min(self.__max_processes, self.__num_classes), self.__num_processes1)):
 			currently_executing_processes.append(mp.Process(target=self.predict_one, args=(self.__ovr_classifiers[i][0], self.__ovr_classifiers[i][1], x, shared_predictions)))
 
 		# Start each process                                                                 

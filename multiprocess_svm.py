@@ -54,6 +54,7 @@ class MP_SVM:
 		self.__max_iter = max_iter
 		self.__solver = solver
 		self.__num_processes = num_processes
+		self.__max_processes = 5
 
 	def __fit_one(self, start, end, shared_classifiers):
 		"""
@@ -97,7 +98,7 @@ class MP_SVM:
 		self.__ys = y
 
 		# The number of training examples per process
-		sub_samples = int(self.__xs.shape[0] / self.__num_processes)
+		sub_samples = int(self.__xs.shape[0] / min(self.__num_processes, self.__max_processes))
 
 		# Create the interprocess communication method
 		manager = mp.Manager()
@@ -105,7 +106,7 @@ class MP_SVM:
 
 		# Create each process where the target is the fit_one function
 		processes = []
-		for i in range(self.__num_processes):
+		for i in range(min(self.__num_processes, self.__max_processes)):
 			start_idx = i*sub_samples
 			end_idx = start_idx + sub_samples
 			processes.append(mp.Process(target = self.__fit_one, args=(start_idx, end_idx, shared_classifiers)))
@@ -180,7 +181,7 @@ class MP_SVM:
 		self.__test_xs = x
 
 		# The number of training examples per process
-		sub_samples = int(self.__test_xs.shape[0] / self.__num_processes)
+		sub_samples = int(self.__test_xs.shape[0] / min(self.__num_processes, self.__max_processes))
 
 		# Create the interprocess communication method
 		mananger = mp.Manager()
@@ -188,7 +189,7 @@ class MP_SVM:
 
 		# Create each process where the target is the predict_one function
 		processes = []
-		for i in range(self.__num_processes):
+		for i in range(min(self.__num_processes, self.__max_processes)):
 			start_idx = i*sub_samples
 			end_idx = start_idx + sub_samples
 			processes.append(mp.Process(target = self.predict_one, args=(start_idx, end_idx, predictions)))
